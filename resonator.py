@@ -35,7 +35,7 @@ class resonator():
         self.A_c = np.pi*a_c**2
 
 
-    def set_Z(self,f,WG = True,rad = True):
+    def set_Z(self,f,WG = True,rad = True,loss = False):
         '''
         This function computes the complex normal impedance of the resonator. This can be accomplished using two different techniques. In the basic acoustic element (BAE) approach
         the resonator is modeled as a compination of acoustic masses and compliance elements. This technique is not valid at very high frequencies, therefore, only the first several
@@ -61,18 +61,55 @@ class resonator():
             self.Zb_c  = Z0_c/(1j*np.sin(k*self.L_c))
 
         else:
+
             self.Za_n =  1j*k*rho*c*self.L_n/(2*self.A_n)
             self.Zb_n = rho*c/(1j*k*self.A_n*self.L_n)
 
             self.Za_c =  1j*k*rho*c*self.L_c/(2*self.A_c)
             self.Zb_c  = rho*c/(1j*k*self.A_c*self.L_c)
 
+            if loss:
+                
+                # viscous boundary layer thickness for air @ 20C [m]
+                del_mu = np.sqrt(2*18e-6/(rho*self.w))
+                # thermal boundary layer thickness for air @ 20C [m]
+                del_k = np.sqrt(2*0.026/(rho*self.w*1006))
+                # ratio of specific heats for air @ 20C
+                gamma = 1.4
+
+                # wetted area
+                P_n = 2*np.pi**a_n*L_n
+                P_c = 2*np.pi**a_c*L_c
+
+                R_mu_n = rho*self.w*del_mu*P_n/(2*self.A_n**2)
+                R_mu_c = rho*self.w*del_mu*P_c/(2*self.A_c**2)
+                
+                R_k_n = ((gamma-1)*self.w*del_k*P_n/(2*rho*c**2))**-1
+                R_k_c =  ((gamma-1)*self.w*del_k*P_c/(2*rho*c**2))**-1
+
+                # Z_c_2 = (np.array([[np.ones(len(self.w)),R_mu_c/2+self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[self.Zb_c**-1+R_k_c**-1,np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),R_mu_c/2+self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))
+                # Z_c_2 = np.array([[np.ones(len(self.w)),R_mu_c/2],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1)@np.array([[np.zeros(len(self.w)),self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1)@ \
+                # np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[1/R_k_c,np.ones(len(self.w))]]).transpose(-1,0,1)@np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[1/self.Zb_c,np.ones(len(self.w))]]).transpose(-1,0,1)
+
         if isinstance(self.w,np.ndarray):
-            self.T_n = np.array([[1+self.Za_n/self.Zb_n,2*self.Za_n+self.Za_n**2/self.Zb_n],[1/self.Zb_n,1+self.Za_n/self.Zb_n]]).transpose(-1,0,1)
-            self.T_c = np.array([[1+self.Za_c/self.Zb_c,self.Za_c],[1/self.Zb_c,np.ones(len(self.w))]]).transpose(-1,0,1)
+
+            if loss:
+                self.T_n = (np.array([[np.ones(len(self.w)),R_mu_n/2+self.Za_n],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[self.Zb_n**-1+R_k_n**-1,np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),R_mu_n/2+self.Za_n],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))
+                self.T_c = (np.array([[np.ones(len(self.w)),R_mu_c/2+self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[self.Zb_c**-1+R_k_c**-1,np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),R_mu_c/2+self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))
+
+            else:
+                self.T_n = np.array([[1+self.Za_n/self.Zb_n,2*self.Za_n+self.Za_n**2/self.Zb_n],[1/self.Zb_n,1+self.Za_n/self.Zb_n]]).transpose(-1,0,1)
+                # self.T_c = np.array([[1+self.Za_c/self.Zb_c,self.Za_c],[1/self.Zb_c,np.ones(len(self.w))]]).transpose(-1,0,1)
+                self.T_c = np.array([[1+self.Za_c/self.Zb_c,2*self.Za_c+self.Za_c**2/self.Zb_c],[1/self.Zb_c,1+self.Za_c/self.Zb_c]]).transpose(-1,0,1)
+
         else:
-            self.T_n = np.array([[1+self.Za_n/self.Zb_n,2*self.Za_n+self.Za_n**2/self.Zb_n],[1/self.Zb_n,1+self.Za_n/self.Zb_n]])
-            self.T_c = np.array([[1+self.Za_c/self.Zb_c,self.Za_c],[1/self.Zb_c,1]])
+            if loss:
+                self.T_n = (np.array([[1,R_mu_n/2+self.Za_n],[0,1]]).transpose(-1,0,1))@(np.array([[1,0],[self.Zb_n**-1+R_k_n**-1,1]]).transpose(-1,0,1))@(np.array([[1,R_mu_n/2+self.Za_n],[0,1]]).transpose(-1,0,1))
+                self.T_c = (np.array([[1,R_mu_c/2+self.Za_c],[0,1]]).transpose(-1,0,1))@(np.array([[1,0],[self.Zb_c**-1+R_k_c**-1,1]]).transpose(-1,0,1))@(np.array([[1,R_mu_c/2+self.Za_c],[0,1]]).transpose(-1,0,1))
+
+            else:
+                self.T_n = np.array([[1+self.Za_n/self.Zb_n,2*self.Za_n+self.Za_n**2/self.Zb_n],[1/self.Zb_n,1+self.Za_n/self.Zb_n]])
+                self.T_c = np.array([[1+self.Za_c/self.Zb_c,self.Za_c],[1/self.Zb_c,1]])
 
         if rad:
             A_rad = 4*self.A_n
@@ -182,10 +219,23 @@ rho = 1.25
 
 #%%
 
-a_n ,a_c,L_n , L_c = 0.01,0.01,0.05,0.05
+a_n ,a_c,L_n , L_c = 0.01,0.05,0.05,0.05
 helm1 = resonator(a_n = a_n,a_c = a_c,L_n =L_n, L_c = L_c)
 
 f0 = c/(4*(L_c+L_c))
+helm1.set_Z(f,WG = False,rad = True,loss = True)
+Z_WG = helm1.Z
+alpha_WG = helm1.alpha
+
+
+helm1.set_Z(f,WG = False,rad = True,loss=False)
+Z_BAE = helm1.Z
+alpha_BAE = helm1.alpha
+
+
+
+f0  = 250
+helm1.minimize_Z(f0)
 helm1.set_Z(f,WG = True)
 Z_WG = helm1.Z
 alpha_WG = helm1.alpha
@@ -194,11 +244,6 @@ helm1.set_Z(f,WG = False)
 Z_BAE = helm1.Z
 alpha_BAE = helm1.alpha
 
-helm1.minimize_Z(f0)
-Z = helm1.set_Z(f,WG = True)
-alpha2 = helm1.set_alpha()
-
-helm1.plot()
 
 #%%
 
@@ -206,17 +251,29 @@ fig,ax = plt.subplots(3,1, figsize = (6.4,4.5))
 plt.subplots_adjust(bottom = 0.15)
 ax[0].tick_params(axis = 'x', labelsize=0)
 ax[0].loglog(f,np.real(Z_WG**-1))
-ax[0].loglog(f,np.real(Z_BAE**-1))
+# ax[0].loglog(f,np.real(Z_BAE**-1))
 ax[0].set_ylabel('$Re[Y] \ [Pa \ s/m^3]$')
 ax[0].set_xlim([100,10e3])
 ax[0].grid()
 
+
 ax[1].set_xlim([100,10e3])
 ax[1].tick_params(axis = 'x', labelsize=0)
 ax[1].loglog(f,np.imag(Z_WG**-1))
-ax[1].loglog(f,np.imag(Z_BAE**-1))
+# ax[1].loglog(f,np.imag(Z_BAE**-1))
 ax[1].set_ylabel('$Im[Y] \ [Pa \ s/m^3]$')
 ax[1].grid()
+
+ax[-1].plot(f,abs((helm1.T_c[:,0,0]/helm1.T_c[:,1,0])/helm1.Z))
+# ax[-1].plot(f,(helm1.T[:,0,0]**-1))
+
+# ax[-1].plot(f,alpha_BAE)
+ax[-1].set_xscale('log')
+ax[-1].set_xlim([100,10e3])
+ax[-1].set_ylabel(r'$\alpha$')
+ax[-1].set_xlabel('Frequency [Hz]')
+ax[-1].grid()
+ax[-1].legend(['Waveguide','Basic Acoustic Element'])
 
 # ax[-1].set_xlim([100,10e3])
 # ax[-1].tick_params(axis = 'x', labelsize=0)

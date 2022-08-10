@@ -14,7 +14,7 @@ from scipy.fft import fft,ifft
 sys.path.insert(0, '/Users/danielweitsman/codes/github/OpenWopWop/pyWopwop')
 import wopwop
 import matplotlib.colors as mcolors
-from helmoltz import Z_helmholtz, opt_wrap,con_fun
+from resonator import Z_helmholtz, opt_wrap,con_fun
 from scipy.optimize import minimize, LinearConstraint,NonlinearConstraint
 
 #%% Sets font parameters
