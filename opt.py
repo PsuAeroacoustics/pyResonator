@@ -7,8 +7,19 @@ from scipy.signal import butter
 from scipy.optimize import differential_evolution,NonlinearConstraint
 import sys
 from time import time
+import h5py
 sys.path.insert(0, os.path.join(os.path.dirname(os.getcwd()),'pyPostAcs'))
 import pyPostAcsFun as fun
+
+#%%
+
+cmap = plt.cm.Spectral.reversed()
+fontName = 'Times New Roman'
+fontSize = 14
+plt.rc('font',**{'family':'serif','serif':[fontName],'size':fontSize})
+plt.rc('mathtext',**{'default':'regular'})
+plt.rc('text',**{'usetex':False})
+plt.rc('lines',**{'linewidth':2})
 
 #%%
 
@@ -54,11 +65,12 @@ def opt_res(opt_in):
 
     print(L2_err)
 
-    if np.isnan(L2_err):
-        raise Exception('nan encountered')
+    # if np.isnan(L2_err):
+    #     opt_res(abs(opt_in.flatten(order = 'F')))
+    #     print('NaN Encountered!!!')
 
     return L2_err
-
+    
 #%%
 
 # Frequency array vector
@@ -93,17 +105,32 @@ a_n_init,L_n_init,a_c_init,L_c_init = 0.003809,0.003809*4,0.003809,0.003809*4
 # Since the optimizer requires a 1D array consisting of the total number of parameters (a_n,L_n,a_c,L_c,# of respontors) x n, that array is generated here 
 # opt_in = np.array([int(N/n),a_n_init,L_n_init,a_c_init,L_c_init]).repeat(n)
 opt_in = np.array([int(N/n),a_c_init,L_c_init]).repeat(n)
-opt_bounds = np.array([[1,25],[a0/(100*2*np.pi*f[-1]),a0/(2*np.pi*f[-1])],[a0/(2*np.pi*f[-1]),50*a0/(2*np.pi*f[-1])]]).repeat(n,axis = 0)
+opt_bounds = np.array([[1,25],[a0/(50*2*np.pi*f[-1]),a0/(2*np.pi*f[-1])],[a0/(2*np.pi*f[-1]),50*a0/(2*np.pi*f[-1])]]).repeat(n,axis = 0)
 
 def get_constraints(lb,ub):
     constraints = NonlinearConstraint(fun = lambda x: [np.sum(np.round(x[:n])),np.sum(np.round(x[:n])*np.pi*x[n:n+n]**2)],lb =lb,ub = ub)
     return constraints
 
 start_t = time()
-res_optimal = differential_evolution(opt_res,bounds = opt_bounds,constraints =get_constraints([1,np.pi*(a0/(2*np.pi*f[-1]))**2],[N,A_s]),popsize=100, updating = 'immediate',polish=False,workers = 1)
+res_opt = differential_evolution(opt_res,bounds = opt_bounds,constraints =get_constraints([1,np.pi*(a0/(2*np.pi*f[-1]))**2],[N,A_s]),popsize=100, updating = 'immediate',polish=True,workers = -1)
 elapsed_t = time()-start_t
 print(elapsed_t)
 
-res_optimal.x
+res_opt = res_opt.x.reshape(int(len(res_opt.x)/3),3,order = 'F')
+Z_tot, alpha = smeared_Z(f,res_opt)
 
-/
+#%%
+
+fig,ax = plt.subplots(1,1, figsize = (6.4,4.5))
+ax.plot(f,alpha)
+ax.set_ylabel(r'$Absorption, \ \alpha$')
+ax.set_xlabel('Frequency [Hz]')
+ax.grid()
+ax.set_xlim([f[0],f[-1]])
+ax.set_ylim([0, 1])
+plt.savefig(os.path.join(os.getcwd(),'opt_res.png'),format = 'png')
+
+with h5py.File(os.path.join(os.getcwd(),'res_opt.h5'), 'a') as h5_f:
+    for k, v in {'f': f, 'res_opt': res_opt,'Z_tot': Z_tot,'alpha':alpha}.items():
+        h5_f.create_dataset(k, shape=np.shape(v), data=v)
+

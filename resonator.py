@@ -1,13 +1,11 @@
-from pickle import FALSE
-from select import select
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import least_squares,minimize, LinearConstraint, NonlinearConstraint,shgo
+from scipy.optimize import minimize, NonlinearConstraint
 import os
-import time
 import re
-from scipy.interpolate import RectBivariateSpline, interp2d
-from scipy.special import jv,j0
+from scipy.interpolate import RectBivariateSpline
+from scipy.special import jv
+
 #%%
 fontName = 'Times New Roman'
 fontSize = 12
@@ -17,6 +15,60 @@ plt.rc('text', **{'usetex': False})
 plt.rc('lines', **{'linewidth': 2})
 
 #%%
+
+class fs():
+    def __init__(self,t,r,phi):
+        '''
+        This function initializes an instance of a "fs" or facesheet object with the following parameters. 
+        '''
+        # facesheet thickness [m]
+        self.t = t
+        # radius of holes in the facesheet [m]
+        self.r = r
+        # perforation rate (porosity)
+        self.phi = phi
+
+        # speed of sound [m/s]
+        self.c = 343
+        # density [kg/m^3]
+        self.rho = 1.125
+        # kinematic viscosity [m^2/s]
+        self.nu = 14.88e-6
+        
+
+    def set_Z(self,f):
+        '''
+        This function computes the complex normal acoustic impedance and absorption of the facesheet. This facesheet model was first derived by Atalla and Sgard and simlifies a generalized model (JCAPL model) by limiting it to the specific case of a perforated facesheet.
+        The model essentially treats the facesheet as an equivalent fluid subject to visco-inertial losses associated with the dissipative effects of the viscous boundary layer and flow distortions (resistive component) within the openings of the facesheet as well as the mass of the 
+        air moving through that opening (reactive component). 
+        [Atalla, Noureddine, and Franck Sgard. "Modeling of perforated plates and screens using rigid frame porous models." Journal of sound and vibration 303.1-2 (2007): 195-208.]
+        '''
+
+        self.w = 2*np.pi*f
+        # Geometric torosity with end correction
+        alpha_inf = 1+2/self.t*(0.48*np.sqrt(np.pi*self.r**2)*(1-1.14*np.sqrt(self.phi)))
+        # Flow resistivity
+        sigma = 8*self.nu*self.rho/(self.phi*self.r**2)
+        G = np.sqrt(1+1j*4*self.w*self.rho*alpha_inf**2*self.nu*self.rho/(sigma**2*self.phi**2*self.r**2))
+        # Effective density
+        rho_e = self.rho*alpha_inf*(1+sigma*self.phi*G/(1j*self.w*self.rho*alpha_inf))
+        self.Z = 1j*self.w*rho_e*self.t/self.phi
+
+        # self.Z = (2*self.t/self.r+4*(0.48*np.sqrt(np.pi*self.r**2)*(1-1.14*np.sqrt(self.phi)))/self.r)*0.5*np.sqrt(2*self.w*self.nu*self.rho**2)/self.phi+1j*self.rho*self.w/self.phi*(2*(0.48*np.sqrt(np.pi*self.r**2)*(1-1.14*np.sqrt(self.phi)))+self.t)
+
+
+        self.alpha = 1 - abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
+
+
+    def get_Z(self):
+        assert hasattr(self,'Z'), 'Impedance has not been computed, run the set_Z(f) function first.'
+        return self.Z
+
+    def get_alpha(self):
+        assert hasattr(self,'Z'), 'The absorption coefficient has not been computed, run the set_Z(f) function first.'
+        return self.alpha
+
+
 
 class resonator():
 

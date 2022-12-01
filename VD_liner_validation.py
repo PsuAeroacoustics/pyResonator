@@ -148,6 +148,37 @@ ax[-1].grid()
 ax[-1].set_xlim([500,3e3])
 ax[-1].set_ylim([0, 1])
 
+#%%
+
+fs1  = res.fs(t = 1e-3,r = 0.5e-3,phi = 0.025)
+fs1.set_Z(f)
+
+Z_tot = fs1.get_Z()+Z_tot
+alpha = 1 - abs((Z_tot-1)/(Z_tot+1))**2
+
+fig,ax = plt.subplots(3,1, figsize = (6.4,4.5))
+ax[0].tick_params(axis = 'x', labelsize=0)
+ax[0].plot(f[1:],np.real(Z_tot))
+ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
+ax[0].set_xlim([500,3e3])
+ax[0].set_ylim([0,10])
+ax[0].grid()
+
+ax[1].tick_params(axis = 'x', labelsize=0)
+ax[1].plot(f[1:],np.imag(Z_tot))
+ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
+ax[1].set_xlim([500,3e3])
+ax[1].set_ylim([-5,5])
+ax[1].grid()
+
+ax[-1].plot(f[1:],alpha)
+ax[-1].set_ylabel(r'$Absorption, \ \alpha$')
+ax[-1].set_xlabel('Frequency [Hz]')
+ax[-1].grid()
+ax[-1].set_xlim([500,3e3])
+ax[-1].set_ylim([0, 1])
+
+
 #%% Optimization space - compare different radii and lengths / compare different neck/chamber radii and lengths
 
 N = 25
