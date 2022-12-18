@@ -52,7 +52,7 @@ ax[-1].legend(['NU1','NU4'])
 #%%
 
 
-f_dir = '/Users/danielweitsman/codes/github/DanWeitsman/bvi_resonator/Tijdeman_gamma'
+f_dir = os.path.join(os.getcwd(),'Tijdeman_gamma')
 f_name = ['re_gamma.txt','imag_gamma.txt']
 
 data_temp = np.empty((len(f_name),36,11))
@@ -150,7 +150,7 @@ ax[-1].set_ylim([0, 1])
 
 #%%
 
-fs1  = res.fs(t = 1e-3,r = 0.5e-3,phi = 0.025)
+fs1  = res.fs(t = 1e-3,r = 0.5e-3,phi = 0.073)
 fs1.set_Z(f)
 
 Z_tot = fs1.get_Z()+Z_tot

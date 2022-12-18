@@ -25,11 +25,11 @@ df = 1
 f_max = 5e3
 f = np.arange(1,f_max/df+df)*df
 
-t,r,phi = 1e-3 ,0.5e-3,0.025
+t,r,phi = 1e-3 ,0.5e-3,0.07
 A_s = np.pi*r**2/phi
 
 
-fs1  = res.fs(t = 1e-3,r = 0.5e-3,phi = 0.025)
+fs1  = res.fs(t = 1e-3,r = 0.5e-3,phi = 0.07)
 fs1.set_Z(f)
 
 L = 60e-3

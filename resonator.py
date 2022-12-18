@@ -20,6 +20,11 @@ class fs():
     def __init__(self,t,r,phi):
         '''
         This function initializes an instance of a "fs" or facesheet object with the following parameters. 
+        Parameter:
+        t: facesheet plate thickness [m]
+        r: radius of opening [m]
+        phi: perforation rate (porosity: total area of openings/area of sample) 
+
         '''
         # facesheet thickness [m]
         self.t = t
@@ -52,12 +57,8 @@ class fs():
         G = np.sqrt(1+1j*4*self.w*self.rho*alpha_inf**2*self.nu*self.rho/(sigma**2*self.phi**2*self.r**2))
         # Effective density
         rho_e = self.rho*alpha_inf*(1+sigma*self.phi*G/(1j*self.w*self.rho*alpha_inf))
-        self.Z = 1j*self.w*rho_e*self.t/self.phi
-
-        # self.Z = (2*self.t/self.r+4*(0.48*np.sqrt(np.pi*self.r**2)*(1-1.14*np.sqrt(self.phi)))/self.r)*0.5*np.sqrt(2*self.w*self.nu*self.rho**2)/self.phi+1j*self.rho*self.w/self.phi*(2*(0.48*np.sqrt(np.pi*self.r**2)*(1-1.14*np.sqrt(self.phi)))+self.t)
-
-
-        self.alpha = 1 - abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
+        self.Z = 1j*self.w*rho_e*self.t/(self.c*self.rho*self.phi)
+        self.alpha = 1 - abs((self.Z-1)/(self.Z+1))**2
 
 
     def get_Z(self):
@@ -249,15 +250,6 @@ class resonator():
         else:
             self.Z = self.P/self.U
 
-        # if isinstance(self.w,np.ndarray):
-        #     self.Z = self.T[:,0,0]/ self.T[:,1,0]
-        #     self.Z_n = self.T_n[:,0,0]/ self.T_n[:,1,0]
-        #     self.Z_c = self.T_c[:,0,0]/ self.T_c[:,1,0]
-        # else:
-        #     self.Z = self.T[0,0]/ self.T[1,0]
-        #     self.Z_n = self.T_n[0,0]/ self.T_n[1,0]
-        #     self.Z_c = self.T_c[0,0]/ self.T_c[1,0]
-
         self.set_alpha()
 
     
@@ -278,44 +270,41 @@ class resonator():
         
         self.alpha = 1 - abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
 
-    # def get_p(self,p_in):
-    #     U = p_in/self.Z
-    #     np.linalg.inv(self.Z)@np.array([[p_in],[U]])
 
 
-    def minimize_Z(self,f,lb=[0,0,0,0,0,0],ub=[np.inf,np.inf,np.inf,np.inf,np.inf,1]):
-        '''
-        This wrapper function performs a constrained optimization of the resonator which determines the dimensions of the resonator that minimizes the reflection coefficient, R
-        for a particular resonance frequency. There are three primary constraint conditions: a_n & a_c > 0, L_n & L_c > 0, L_n/L_c <1. The lower and upper bounds for each condition
-        can be specified as lists. Where the first four elements correspond to the min and max values of a_n, a_c, L_n, and L_c. The fourth element of the upper bound list 
-        sets the maximum length of the resonator (L_n+L_c). The final element simply states that the neck radius must be less than that of the cavity, a_n < a_c.
+    # def minimize_Z(self,f,lb=[0,0,0,0,0,0],ub=[np.inf,np.inf,np.inf,np.inf,np.inf,1]):
+    #     '''
+    #     This wrapper function performs a constrained optimization of the resonator which determines the dimensions of the resonator that minimizes the reflection coefficient, R
+    #     for a particular resonance frequency. There are three primary constraint conditions: a_n & a_c > 0, L_n & L_c > 0, L_n/L_c <1. The lower and upper bounds for each condition
+    #     can be specified as lists. Where the first four elements correspond to the min and max values of a_n, a_c, L_n, and L_c. The fourth element of the upper bound list 
+    #     sets the maximum length of the resonator (L_n+L_c). The final element simply states that the neck radius must be less than that of the cavity, a_n < a_c.
 
-        The optimizer changes the geometrical attributes (a_c,a_n,L_c,L_n) of the resonator instance during each itteration. 
+    #     The optimizer changes the geometrical attributes (a_c,a_n,L_c,L_n) of the resonator instance during each itteration. 
         
-        parameters:
-        lb: list of six lower bounds that correspond to each of the constraints. 
-        ub: list of six upper bounds that correspond to each of the constraints. 
+    #     parameters:
+    #     lb: list of six lower bounds that correspond to each of the constraints. 
+    #     ub: list of six upper bounds that correspond to each of the constraints. 
 
-        '''
+    #     '''
 
-        def get_constraints(lb,ub):
-            # constraints = NonlinearConstraint(fun = lambda x: [x[0],x[2],x[1],x[3],x[1]+x[3],x[0]/x[2]],lb =lb,ub = ub)
-            #(a_n,a_c,L_n,L_c)
-            constraints = NonlinearConstraint(fun = lambda x: [x[0],x[2],x[1],x[3], x[1]+x[3], x[1]*np.pi*x[0]**2+x[3]*np.pi*x[2]**2,x[0]/x[2]],lb =lb,ub = ub)
-            return constraints
+    #     def get_constraints(lb,ub):
+    #         # constraints = NonlinearConstraint(fun = lambda x: [x[0],x[2],x[1],x[3],x[1]+x[3],x[0]/x[2]],lb =lb,ub = ub)
+    #         #(a_n,a_c,L_n,L_c)
+    #         constraints = NonlinearConstraint(fun = lambda x: [x[0],x[2],x[1],x[3], x[1]+x[3], x[1]*np.pi*x[0]**2+x[3]*np.pi*x[2]**2,x[0]/x[2]],lb =lb,ub = ub)
+    #         return constraints
 
-        def opt_wrap(dims,f):
-            self.a_n, self.L_n, self.a_c,self.L_c = dims[0],dims[1], dims[2],dims[3]
-            self.set_Z(f,WG=False,rad = True)
-            self.R = abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
-            # print(f'{abs((self.Z/(c*rho)-1)/(self.Z/(c*rho)+1))**2}, {1-4*np.real(self.Z/(c*rho))/((1+np.real(self.Z/(c*rho)))**2+np.imag(self.Z/(c*rho))**2)}')
-            # self.R =  1-4*np.real(self.Z/(c*rho))/((1+np.real(self.Z/(c*rho)))**2+np.imag(self.Z/(c*rho))**2)
-            # print(f'Searching for optimal geometry: R = {round(R,2)}, a_n = {round(self.a_n,2)}, L_n = {round(self.a_n,2)}, a_c = {round(self.a_n,2)}, L_c = {round(self.a_n,2)}')
-            print(f'Searching for optimal geometry: alpha = {1-self.R}, a_n = {self.a_n}, L_n = {self.L_n}, a_c = {self.a_c}, L_c = {self.L_c}')
+    #     def opt_wrap(dims,f):
+    #         self.a_n, self.L_n, self.a_c,self.L_c = dims[0],dims[1], dims[2],dims[3]
+    #         self.set_Z(f,WG=False,rad = True)
+    #         self.R = abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
+    #         # print(f'{abs((self.Z/(c*rho)-1)/(self.Z/(c*rho)+1))**2}, {1-4*np.real(self.Z/(c*rho))/((1+np.real(self.Z/(c*rho)))**2+np.imag(self.Z/(c*rho))**2)}')
+    #         # self.R =  1-4*np.real(self.Z/(c*rho))/((1+np.real(self.Z/(c*rho)))**2+np.imag(self.Z/(c*rho))**2)
+    #         # print(f'Searching for optimal geometry: R = {round(R,2)}, a_n = {round(self.a_n,2)}, L_n = {round(self.a_n,2)}, a_c = {round(self.a_n,2)}, L_c = {round(self.a_n,2)}')
+    #         print(f'Searching for optimal geometry: alpha = {1-self.R}, a_n = {self.a_n}, L_n = {self.L_n}, a_c = {self.a_c}, L_c = {self.L_c}')
 
-            return self.R
+    #         return self.R
 
-        minimize(opt_wrap,x0 = [self.a_n,self.L_n,self.a_c,self.L_c],constraints = get_constraints(lb,ub),args = f,method = 'trust-constr')
+    #     minimize(opt_wrap,x0 = [self.a_n,self.L_n,self.a_c,self.L_c],constraints = get_constraints(lb,ub),args = f,method = 'trust-constr')
 
     def plot(self,xlim = [1e2,10e3]):
         
@@ -380,12 +369,6 @@ class resonator():
         del data_temp
         
         return s,ka,data
-
-        # f_re_gamma = RectBivariateSpline(x = s,y = ka, z = np.real(data))
-        # f_imag_gamma = RectBivariateSpline(x = s,y = ka, z = np.imag(data))
-
-
-        # gamma = f_re_gamma(x = 2.2,y = np.arange(10)*0.05)+1j*f_imag_gamma(x = 2.2,y = np.arange(10)*0.05)
 
 
 #%%

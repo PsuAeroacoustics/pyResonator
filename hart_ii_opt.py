@@ -96,71 +96,78 @@ def opt_res(opt_in,facesheet=True):
     
 #%%
 
+elements = 48
+dt = 0.00015994586253613723
+iterations = 5400
+df = (iterations*dt)**-1
+
 # Frequency array vector
-df = 1
-f_max = 2**12
-f = np.arange(1,int(f_max/df))*df
+f = np.arange(1,iterations)*df
 
 # Density [kg/m^2]
 rho = 1.125
 # SoS [m/s]
 a0 = 340
 
-# Total area of the test sample that fits in the the LaRC NIT facility (2"x2").
-A_s = 2*2*0.0254**2
+#%% Operating condition corresponding to the maximum BVI case of the Hart II program
 
+# rotational rate [rad/s] - "A comprehensive rotary-wing data base for code validation: the HART II international workshop" - V.D Wall
+omega = 109
+# Bo-105 radius [m]
+R = 2
+# Bo-105 chord [m]
+c = .121
+# Bo-105 root cut-out [m]
+e = 0.44
+# Bo-105 max thickness [m]
+t = 0.12*c
+# Estimated blade volume [m^2]
+V0 = 0.7*(R-e)/48*t*c*6
+
+# Blade surface area over which the resonators would be applied.
+A_s = 0.25*c*((R-e)/48)
+
+#%%%
 # Generates frequency weighting function for total L2 error. BVI is concentrated in mid-range frequencies, 
 # therefore, the weighting function is the magnitude of the impulse response of a 4th order bandpass butterworth 
 # filter with cutoff frequendies of 500Hz and 1500Hz.
-n,d = butter(4,  [500,1500] ,btype = 'bp',fs = 2*df*len(f))
+n,d = butter(4,  [400,1500] ,btype = 'bp',fs = 2*df*len(f))
 f2,y,h,phase = fun.filt_response(n,d,fs = df*len(f),N = 2*len(f) ,plot=False)
 W = np.abs(h)
 
-
-# fs1  = res.fs(t = 0.032*0.0254,r = 0.029/2*0.0254,phi = .07)
-# fs1.set_Z(f[1:])
-# Z = fs1.get_Z()
-
-
 #%%
 
-# Total number of resonators in the test sample
-N = 25
 # number of different types of resonators within the sample
-n = 2
+n = 4
 
 a_max = a0/(2*np.pi*f[-1])
-# initial values of the resonators
-a_n_init,L_n_init,a_c_init,L_c_init = 0.003809,0.003809*4,0.003809,0.003809*4
-# Since the optimizer requires a 1D array consisting of the total number of parameters (a_n,L_n,a_c,L_c,# of respontors) x n, that array is generated here 
-# opt_in = np.array([int(N/n),a_n_init,L_n_init,a_c_init,L_c_init]).repeat(n)
 
-opt_in = np.array([int(N/n),a_n_init,L_n_init,a_c_init,L_c_init]).repeat(n)
-# opt_in = np.array([int(N/n),a_n_init,L_n_init,a_c_init,L_c_init]).repeat(n)
-
+# set to true in order to include the face sheet in the optimization 
 facesheet = False
 
-if facesheet:
-    opt_bounds = np.concatenate((np.array([[1,N],[a_max/200,a_max],[a_max/200,60*a_max],[a_max/200,a_max],[a_max/200,60*a_max]]).repeat(n,axis = 0),np.array([[0,0.5*0.0254],[1,20],[0,a_max]])))
-else:
-    opt_bounds = np.array([[1,N],[a_max/200,a_max],[a_max/200,60*a_max],[a_max/200,a_max],[a_max/200,60*a_max]]).repeat(n,axis = 0)
+# min and max dimensions of the resonator neck and cavity
+r_min, r_max, L_min, L_max = a0/(2*np.pi*2000)*.05,a_max,a0/(2*np.pi*2000),a0/(2*np.pi*100)
 
-# opt_bounds = np.array([[1,N],[a0/(100*2*np.pi*f[-1]),a0/(2*np.pi*f[-1])],[a0/(50*2*np.pi*f[-1]),100*a0/(2*np.pi*f[-1])]]).repeat(n,axis = 0)
+if facesheet:
+    opt_bounds = np.concatenate((np.array([[1,1000],[r_min, r_max],[L_min, L_max],[r_min, r_max],[L_min, L_max]]).repeat(n,axis = 0),np.array([[0.05*0.0254,0.5*0.0254],[1,100],[5e-4,5e-4]])))
+else:
+    opt_bounds = np.array([[1,1000],[r_min, r_max],[L_min, L_max],[r_min, r_max],[L_min, L_max]]).repeat(n,axis = 0)
+
 
 def get_constraints(lb,ub):
     # constraints = NonlinearConstraint(fun = lambda x: [np.sum(np.round(x[:n])),np.sum(np.round(x[:n])*np.pi*x[n:n+n]**2)],lb =lb,ub = ub)
     if facesheet:
-        constraints = NonlinearConstraint(fun = lambda x: [np.sum(np.round(x[:n])),np.sum(np.round(x[:n])*np.pi*x[n:n+n]**2)]+list(x[n:n+n]/x[3*n:3*n+n])+list(x[-1]**2*x[-2]/(x[n:n+n]**2)),lb =lb,ub = ub)
+        constraints = NonlinearConstraint(fun = lambda x: [np.sum(np.round(x[:n])*np.pi*x[n:n+n]**2),np.sum(np.round(x[:n])*(np.pi*x[n:n+n]**2*x[2*n:2*n+n]+np.pi*x[3*n:3*n+n]**2*x[4*n:4*n+n]))]+list(x[n:n+n]/x[3*n:3*n+n])+list(np.pi*x[-1]**2*np.round(x[-2])/(np.pi*x[n:n+n]**2)),lb =lb,ub = ub)
     else:
-        constraints = NonlinearConstraint(fun = lambda x: [np.sum(np.round(x[:n])),np.sum(np.round(x[:n])*np.pi*x[n:n+n]**2)]+list(x[n:n+n]/x[3*n:3*n+n]),lb =lb,ub = ub)
+        constraints = NonlinearConstraint(fun = lambda x: [np.sum(np.round(x[:n])*np.pi*x[n:n+n]**2),np.sum(np.round(x[:n])*(np.pi*x[n:n+n]**2*x[2*n:2*n+n]+np.pi*x[3*n:3*n+n]**2*x[4*n:4*n+n]))]+list(x[n:n+n]/x[3*n:3*n+n]),lb =lb,ub = ub)
     return constraints
 
 start_t = time()
 # mutation = 0.05,recombination = 0.5
 if facesheet:
-    opt_output = differential_evolution(opt_res,args = (facesheet,),bounds = opt_bounds,constraints =get_constraints([1,np.pi*(a_max)**2]+[0]*n+[0]*n,[N,A_s]+[1]*n+[1]*n),polish=False,workers = -1)
+     opt_output = differential_evolution(opt_res,args = (facesheet,),bounds = opt_bounds,constraints =get_constraints([0,0]+[0]*n+[0.07]*n,[A_s,V0]+[1]*n+[.07]*n),polish=False,workers = -1,maxiter = int(1e10))
 else:
-    opt_output = differential_evolution(opt_res,args = (facesheet,),bounds = opt_bounds,constraints =get_constraints([1,np.pi*(a_max)**2]+[0]*n,[N,A_s]+[1]*n),polish=False,workers = -1)
+    opt_output = differential_evolution(opt_res,args = (facesheet,),bounds = opt_bounds,constraints =get_constraints([0,0]+[0]*n,[A_s,V0]+[1]*n),polish=False,workers = -1,maxiter = int(1e10))
 
 elapsed_t = time()-start_t
 print(elapsed_t)
@@ -173,6 +180,7 @@ else:
     res_opt = opt_output.x.reshape(int(len(opt_output.x)/5),5,order = 'F')
     Z_tot, alpha = smeared_Z(f,res_opt,facesheet = facesheet)
 
+print(res_opt)
 #%%
 
 fig,ax = plt.subplots(1,1, figsize = (6.4,4.5))
