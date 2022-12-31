@@ -151,9 +151,13 @@ ax[-1].set_ylim([0, 1])
 #%%
 
 fs1  = res.fs(t = 1e-3,r = 0.5e-3,phi = 0.073)
-fs1.set_Z(f)
+fs1.set_Z(f[1:])
 
-Z_tot = fs1.get_Z()+Z_tot
+Z_tot = np.zeros(len(f[1:]))
+for k,v in helm_dict.items():
+    Z_tot = Z_tot+N/len(L)*A_ratio*(v.Z+fs1.get_Z())**-1
+Z_tot = Z_tot**-1
+
 alpha = 1 - abs((Z_tot-1)/(Z_tot+1))**2
 
 fig,ax = plt.subplots(3,1, figsize = (6.4,4.5))
