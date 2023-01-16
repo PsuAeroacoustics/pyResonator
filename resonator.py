@@ -372,30 +372,57 @@ class resonator():
 
 
 #%%
+# vdat_file = '/Users/danielweitsman/Documents/research/BVI_helmholtz/probe_data.csv'
+vdat_file = '/Users/danielweitsman/Downloads/probe_data_rad.csv'
+with open(vdat_file) as f:
+    vdat = np.array(re.split( ",|\n", f.read().replace('i','j')))[:-1]
+    vdat = vdat.reshape(int(len(vdat)/3),3)
+    vdat = vdat.astype(complex)
 
-# vdat_file = '/Users/danielweitsman/Documents/research/BVI_helmholtz/probe_data_1pa.csv'
-# with open(vdat_file) as f:
-#     vdat = np.array(re.split( ",|\n", f.read().replace('i','j')))[:-1]
-#     vdat = vdat.reshape(int(len(vdat)/3),3)
-#     vdat = vdat.astype(complex)
+c = 340
+f = np.real(vdat[:,0])
+k = 2*np.pi*f/c
+N = len(vdat)
+s = 0.03175
+l = 0.09525
+rho = 1.125
+S_12 = np.real(np.conj(vdat[:,1])*vdat[:,-1])
+S_11 =  np.real(np.abs(vdat[:,-1])**2)
+H_12 = S_12/S_11
+H_i = np.exp(-1j*k*s)
+H_r = np.exp(1j*k*s)
 
+R_1 = (H_12-H_i)/(H_r-H_12)
+R = R_1*np.exp(1j*2*k*l)
+Z = ((1+R)/(1-R))
+alpha =  1 - abs((Z/(rho*c)-1)/(Z/(rho*c)+1))**2
+alpha = 4* np.real(Z)/((np.real(Z)+1)**2+np.imag(Z)**2)
 
-# f = np.real(vdat[:,0])
-# k = 2*np.pi*f/c
-# df = np.diff(f[:2])[0]
-# N = len(vdat)
-# s = 0.03175
-# l = 0.09525
+fig,ax = plt.subplots(3,1, figsize = (6.4,4.5))
+plt.subplots_adjust(bottom = 0.15)
+ax[0].tick_params(axis = 'x', labelsize=0)
+ax[0].loglog(f,np.real(Z))
+# ax[0].set_ylabel('$Re[Y] \ [Pa \ s/m^3]$')
+ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
+ax[0].set_xlim([100,4e3])
+ax[0].grid()
 
-# S_12 = np.real(np.conj(vdat[:,-1])*vdat[:,1])
-# S_11 =  np.real(np.abs(vdat[:,-1])**2)
-# H_12 = S_12/S_11
-# H_i = np.exp(-1j*k*s)
-# H_r = np.exp(1j*k*s)
+ax[1].tick_params(axis = 'x', labelsize=0)
+ax[1].loglog(f,np.imag(Z))
+ax[1].loglog(f,-np.tan(k*.08)**-1)
 
-# R_1 = (H_12-H_i)/(H_r-H_12)
-# R = R_1*np.exp(1j*2*k*l)
-# Z = (1+R)/(1-R)
+# ax[1].set_ylabel('$Im[Y] \ [Pa \ s/m^3]$')
+ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
+ax[1].set_xlim([100,4e3])
+ax[1].grid()
+
+ax[-1].semilogx(f,alpha)
+# ax[-1].set_ylabel('$Phase \ [\circ]$')
+ax[-1].set_xlabel('Frequency [Hz]')
+ax[-1].grid()
+ax[-1].set_xlim([100,4e3])
+ax[-1].set_ylim([0, 1])
+ax[-1].legend(['Waveguide','Basic Acoustic Element','FEM'])
 
 # #%%
 # # speed of sound [m/s]
