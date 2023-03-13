@@ -146,7 +146,7 @@ a_max = a0/(2*np.pi*f[-1])
 facesheet = False
 
 # min and max dimensions of the resonator neck and cavity
-r_min, r_max, L_min, L_max = a0/(2*np.pi*2000)*.05,a_max,a0/(2*np.pi*2000),a0/(2*np.pi*100)
+r_min, r_max, L_min, L_max = a0/(2*np.pi*2000)*.05,a0/(2*np.pi*2000),a0/(2*np.pi*2000),a0/(2*np.pi*350)
 
 if facesheet:
     opt_bounds = np.concatenate((np.array([[1,1000],[r_min, r_max],[L_min, L_max],[r_min, r_max],[L_min, L_max]]).repeat(n,axis = 0),np.array([[0.05*0.0254,0.5*0.0254],[1,100],[5e-4,5e-4]])))
@@ -167,7 +167,7 @@ start_t = time()
 if facesheet:
      opt_output = differential_evolution(opt_res,args = (facesheet,),bounds = opt_bounds,constraints =get_constraints([0,0]+[0]*n+[0.07]*n,[A_s,V0]+[1]*n+[.07]*n),polish=False,workers = -1,maxiter = int(1e10))
 else:
-    opt_output = differential_evolution(opt_res,args = (facesheet,),bounds = opt_bounds,constraints =get_constraints([0,0]+[0]*n,[A_s,V0]+[1]*n),polish=False,workers = -1,maxiter = int(1e10))
+    opt_output = differential_evolution(opt_res,args = (facesheet,),bounds = opt_bounds,constraints =get_constraints([0,0]+[0]*n,[A_s,V0]+[1]*n),polish=False,maxiter = int(1e10))
 
 elapsed_t = time()-start_t
 print(elapsed_t)
