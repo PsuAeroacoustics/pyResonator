@@ -33,10 +33,11 @@ class resonator:
 
 class node(resonator):
 
-    def __init__(self,f = None,parent = None, position = None,count = None ,L = None, r = None):
+    def __init__(self,f = None,parent = None, position = None,ind = None,count = None ,L = None, r = None):
         self.r = r
         self.parent = parent
         self.position = position
+        self.ind = ind
         self.f = f
         self.count = count
         self.L = L
@@ -72,6 +73,7 @@ def route(sample,resonator):
         current_node = heappop(open_set)
         current_node.r = resonator.r
         print(f'Current Node: {current_node.position} - Current Length: {current_node.L}')
+        
         if current_node.L >= resonator.length:
             print('Path found!')
             resonator.path = trace_path(current_node,resonator.start_node)
@@ -137,7 +139,9 @@ pntsPerXsec = int(indHeader[0][1][2])
 
 surfNodes = surfNodes.reshape((pntsPerXsec,nXsecs,3) ,order = 'F')
 nXsecs = 4
-surfNodes = surfNodes[:,30:34]
+Xsec = 30
+surfNodes = surfNodes[:,Xsec:Xsec+nXsecs]
+
 
 min_z_surfNodes = surfNodes[:int(pntsPerXsec/2)+3]
 max_z_surfNodes = surfNodes[int(pntsPerXsec/2)+2:]
@@ -157,13 +161,31 @@ x_max = np.max(surfNodes[:,:,0])
 # max_y_spline = interp.LinearNDInterpolator(points = np.array((max_z_surfNodes[:,0],max_z_surfNodes[:,-1])).transpose(),values = max_z_surfNodes[:,1])
 # min_y_spline = interp.LinearNDInterpolator(points = np.array((min_z_surfNodes[:,0],min_z_surfNodes[:,-1])).transpose(),values = min_z_surfNodes[:,1])
 
-max_z_spline = interp.LinearNDInterpolator(points = max_z_surfNodes[:,:2],values =max_z_surfNodes[:,-1])
-min_z_spline = interp.LinearNDInterpolator(points = min_z_surfNodes[:,:2],values =min_z_surfNodes[:,-1])
-
 LENodes = np.float64(dataSorted['Component 1']['STICK_NODE'][1:, :3])
 TENodes = np.float64(dataSorted['Component 1']['STICK_NODE'][1:, 3:6])
 c = np.linalg.norm(abs(LENodes - TENodes), axis=1)
-dx = (y_max-y_min)/25
+
+dx = np.mean(c)/100
+# dx = (y_max-y_min)/100
+
+max_bound = np.max(np.max(surfNodes,axis = 0),axis = 0)+2*dx
+min_bound = np.min(np.min(surfNodes,axis = 0),axis = 0)-2*dx
+bound_range = max_bound-min_bound
+dx = bound_range/np.round(bound_range/dx)
+
+x,y,z = [np.squeeze(np.arange(bound_range[i]/dx[i]+1)*dx[i]+min_bound[i]) for i in range(3)]
+x2,y2 = np.meshgrid(x,y)
+
+grid_coord = np.array(np.meshgrid(x,y,z))
+grid = np.ones(grid_coord.shape[1:])
+grid_ind = np.array(np.meshgrid(np.arange(len(x)),np.arange(len(y)),np.arange(len(z))))
+
+max_z_spline = interp.griddata(points = max_z_surfNodes[:,:-1],values =max_z_surfNodes[:,-1],xi =(grid_coord[0],grid_coord[1]),fill_value=0,method = 'linear')
+min_z_spline = interp.griddata(points = min_z_surfNodes[:,:-1],values =min_z_surfNodes[:,-1],xi =(grid_coord[0],grid_coord[1]), fill_value=0,method = 'linear')
+
+# grid[(np.isnan(min_z_spline(x2,y2))) & (np.isnan(max_z_spline(x2,y2)))]= 0
+grid[min_z_spline > grid_coord[-1]] = 0
+grid[max_z_spline < grid_coord[-1]] = 0
 
 # res_start = [(3,3,10),(5,5,10),(4,4,10),(9,6,10)]
 # res_L = [100,25,50,50]
@@ -185,7 +207,7 @@ if N_res%2 != 0:
 L_tot = res_data['res_opt'][:,2]+res_data['res_opt'][:,-1]
 r_tot =  np.max((res_data['res_opt'][:,1],res_data['res_opt'][:,3]),axis = 0)
 
-N_rows = 4
+N_rows = 7
 N_columns = int(N_res/N_rows)
 
 # if N_columns >= np.floor((y_max-y_min)/(2*r_max)):
@@ -194,15 +216,28 @@ N_columns = int(N_res/N_rows)
 #         N_columns = int(N_res/N_rows)
 #         print(N_columns)
 
-res_spacing = (y_max-y_min)/N_columns
-y_res = np.arange(N_columns)*res_spacing+y_min
-x_res = np.arange(N_rows)*N_rows*res_spacing+x_min+0.1*np.mean(c)
+res_spacing = (y_max-y_min)/(N_columns+1)
+res_spacing_ind = int(np.floor(res_spacing/dx[1]))
+y_res_ind = np.squeeze(np.where((y<y_max) &(y>y_min)))[res_spacing_ind-1::res_spacing_ind][:N_columns]
+y_res = y[y_res_ind]
+# grid_coord[1][y_res_ind][:,x_res_ind][:,:,0]-y_res
 
-x2_res,y2_res = np.meshgrid(x_res,y_res)
-z2_res = max_z_spline((x2_res,y2_res))
+res_spacing_ind = int(np.floor(res_spacing/dx[0]))
+x_res_ind = np.squeeze(np.where(x<(x_min+0.1*np.mean(c))))[-1]+np.squeeze(np.where((x<x_max) &(x>x_min)))[::res_spacing_ind][:N_rows]
+x_res = x[x_res_ind]
 
-res_type= np.zeros(z2_res.shape)
-res_type[:,0] = np.tile(np.arange(len(res_data['res_opt'])),int(N_columns/len(res_data['res_opt']))+1)[:N_columns]
+x_res,y_res = np.meshgrid(x_res,y_res)
+# z_res = interp.griddata(points = max_z_surfNodes[:,:-1],values =max_z_surfNodes[:,-1],xi =(x_res,y_res),method = 'linear')
+
+z_res = max_z_spline[y_res_ind][:,x_res_ind][:,:,0]
+# z_res_ind = [np.squeeze(np.where(z_res[iter_column,iter_row]<z))[0] for iter_column in range(N_columns) for iter_row in range(N_rows)]
+# grid_coord[-1][x_res_ind][:,y_res_ind].shape
+z_res_ind = np.zeros((N_columns,N_rows))
+for iter_row in range(N_rows):
+    for iter_column in range(N_columns):
+        z_res_ind[iter_column,iter_row] = int(np.squeeze(np.where(z_res[iter_column,iter_row]<z))[0])
+
+res_type= np.zeros(z_res.shape)
 for i in range(N_rows-1):
     res_type[:,i+1] = np.roll(res_type[:,i],int(len(res_data['res_opt'])/2))
 res_type = res_type.astype(int)
@@ -215,8 +250,10 @@ liner = sample(size = [0,10,0,10,0,10],N_res = N_res,dx = dx)
 res = {}
 for iter_row in range(N_rows):
     for iter_column in range(N_columns):
-        res_temp = resonator(start_node=node(position = [x2_res[iter_column,iter_row],y2_res[iter_column,iter_row],z2_res[iter_column,iter_row]],L = 0),length = L_tot[res_type[iter_column,iter_row]],r=r_tot[res_type[iter_column,iter_row]])
-        res = {**res,**{f'res{iter_row*N_columns+iter_column}':res_temp}}
+        
+        # z_res_ind = np.squeeze(np.where(z_res[iter_column,iter_row]<z))[0]
+        res_temp = resonator(start_node=node(position = [x_res[iter_column,iter_row],y_res[iter_column,iter_row],z[int(z_res_ind[iter_column,iter_row])] ], ind = [x_res_ind[iter_row],y_res_ind[iter_column],int(z_res_ind[iter_column,iter_row])],L = 0),length = L_tot[res_type[iter_column,iter_row]],r=r_tot[res_type[iter_column,iter_row]])
+        res = {**res,**{f'res{iter_row*N_columnsx.shap+iter_column}':res_temp}}
 liner.resonators = res
 
 stensile = np.array([(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)])
@@ -265,14 +302,15 @@ ax.set_ylabel('y')
 ax.set_zlabel('z')
 plt.grid()
 
-# fig = plt.figure()
-# ax = plt.axes(projection='3d')
-# ax.plot(surfNodes[:,:,0],surfNodes[:,:,1],surfNodes[:,:,2])
-# ax.scatter3D(surfNodes[:,:,0],surfNodes[:,:,1],surfNodes[:,:,2])
-# ax.set_xlabel('x')
-# ax.set_ylabel('y')
-# ax.set_zlabel('z')
-# plt.grid()
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.plot(max_z_surfNodes[:,0],max_z_surfNodes[:,1],max_z_surfNodes[:,2])
+ax.plot(min_z_surfNodes[:,0],min_z_surfNodes[:,1],min_z_surfNodes[:,2])
+ax.scatter3D(grid_coord[0,10][grid[0,10].astype(bool)],grid_coord[1,10][grid[1,10].astype(bool)],grid_coord[2,10][grid[2,10].astype(bool)])
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.set_zlabel('z')
+plt.grid()
 
 fig,ax = plt.subplots(1,1,)
 ax.plot(surfNodes[:int(pntsPerXsec/2)+3,0,0],surfNodes[:int(pntsPerXsec/2)+3,0,-1])
