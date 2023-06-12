@@ -7,7 +7,8 @@ import os
 import re
 from scipy.interpolate import interp2d,RectBivariateSpline
 # Frequency array vector
-df = 1
+
+df = .25
 f_max = 3e3
 f = np.arange(int(f_max/df))*df
 
@@ -22,99 +23,84 @@ A_ratio = .3**2/2**2
 
 #%% Single uniform depth resonator located at center of sample (NU1)
 
-a_n ,a_c,L_n , L_c = 0.006286,0.006286,0.04445/2,0.04445/2
-helm1 = res.resonator(a_n = a_n,a_c = a_c,L_n =L_n, L_c = L_c)
-helm1.set_Z(f[1:],model = 'WG',rad = True,loss = False,interior = True)
-Z_tot = (A_ratio*helm1.Z**-1)**-1
+# a_n ,a_c,L_n , L_c = 0.006286,0.006286,0.04445/2,0.04445/2
+# helm1 = res.resonator(a_n = a_n,a_c = a_c,L_n =L_n, L_c = L_c)
+# helm1.set_Z(f[1:],model = 'WG',rad = True,loss = False,interior = True)
+# Z_tot = (A_ratio*helm1.Z**-1)**-1
 
-helm1.set_Z(f[1:],model = 'Kirchoff',rad = True,interior = False)
-Z_tot_2 = (A_ratio*helm1.Z**-1)**-1
+# helm1.set_Z(f[1:],model = 'Kirchoff',rad = True,interior = False)
+# Z_tot_2 = (A_ratio*helm1.Z**-1)**-1
 
-fig,ax = plt.subplots(1,2, figsize = (8,4.5))
-plt.subplots_adjust(bottom = 0.15)
-ax[0].plot(f[1:],np.real(Z_tot),c = 'black')
-ax[0].plot(f[1:],np.real(Z_tot_2),c = 'r',linestyle = '--')
-ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
-ax[0].set_xlim([1400,2200])
-ax[0].set_ylim([0,1.5])
-ax[0].grid()
-ax[0].set_xlabel('Frequency [Hz]')
-
-ax[1].plot(f[1:],np.imag(Z_tot),c = 'black')
-ax[1].plot(f[1:],np.imag(Z_tot_2),c = 'r',linestyle = '--')
-ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
-ax[1].set_xlim([1400,2200])
-ax[1].set_ylim([-5,5])
-ax[1].grid()
-ax[1].set_xlabel('Frequency [Hz]')
-ax[-1].legend(['NU1','NU4'])
-
-#%%
-
-
-f_dir = os.path.join(os.getcwd(),'Tijdeman_gamma')
-f_name = ['re_gamma.txt','imag_gamma.txt']
-
-data_temp = np.empty((len(f_name),36,11))
-for i,n in enumerate(f_name):
-    with open(os.path.join(f_dir,n)) as f:
-        data_temp[i] = np.array(re.split("\t|\n",f.read())).reshape((36,11)).astype(float)
-s = data_temp[0,1:,0]
-ka = data_temp[0,0,1:]
-
-data = data_temp[0,1:,1:]+1j*data_temp[1,1:,1:]
-del data_temp
-
-f_re_gamma = RectBivariateSpline(x = s,y = ka, z = np.real(data))
-f_imag_gamma = RectBivariateSpline(x = s,y = ka, z = np.imag(data))
-
-gamma = f_re_gamma(x = 2.2,y = np.arange(10)*0.05)+1j*f_imag_gamma(x = 2.2,y = np.arange(10)*0.05)
-
-#%%
-
-
-a_n ,a_c,L_n , L_c = 0.005388,0.005388,0.0857504/2,0.0857504/2
-helm1 = res.resonator(a_n = a_n,a_c = a_c,L_n =L_n, L_c = L_c)
-helm1.set_Z(f[1:],model = 'k',rad = False,interior = False,loss = True)
-Z_tot = (25*A_ratio*(helm1.Z)**-1)**-1
-Z_tot_2 = -(25*A_ratio*np.tan(2*np.pi*f[1:]/a0*0.0857504))**-1
-
-fig,ax = plt.subplots(1,2, figsize = (8,4.5))
-plt.subplots_adjust(wspace = 0.3)
-
+# fig,ax = plt.subplots(1,2, figsize = (8,4.5))
 # plt.subplots_adjust(bottom = 0.15)
-ax[0].plot(f[1:],np.real(Z_tot),c = 'black')
-ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
-ax[0].set_xlim([400,3e3])
-ax[0].set_ylim([0,5])
-ax[0].grid()
-ax[0].set_xlabel('Frequency [Hz]')
+# ax[0].plot(f[1:],np.real(Z_tot),c = 'black')
+# ax[0].plot(f[1:],np.real(Z_tot_2),c = 'r',linestyle = '--')
+# ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
+# ax[0].set_xlim([1400,2200])
+# ax[0].set_ylim([0,1.5])
+# ax[0].grid()
+# ax[0].set_xlabel('Frequency [Hz]')
 
-ax[1].plot(f[1:],np.imag(Z_tot),c = 'black')
-# ax[1].plot(f[1:],Z_tot_2)
-ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
-ax[1].set_xlim([400,3e3])
-ax[1].set_ylim([-10,5])
-ax[1].grid()
-ax[1].set_xlabel('Frequency [Hz]')
+# ax[1].plot(f[1:],np.imag(Z_tot),c = 'black')
+# ax[1].plot(f[1:],np.imag(Z_tot_2),c = 'r',linestyle = '--')
+# ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
+# ax[1].set_xlim([1400,2200])
+# ax[1].set_ylim([-5,5])
+# ax[1].grid()
+# ax[1].set_xlabel('Frequency [Hz]')
 # ax[-1].legend(['NU1','NU4'])
+
+
+# #%%
+
+
+# a_n ,a_c,L_n , L_c = 0.005388,0.005388,0.0857504/2,0.0857504/2
+# helm1 = res.resonator(a_n = a_n,a_c = a_c,L_n =L_n, L_c = L_c)
+# helm1.set_Z(f[1:],model = 'Kirchoff',rad = True,loss = False,interior = False, table = False)
+# Z_tot = (25*A_ratio*(helm1.Z)**-1)**-1
+# Z_tot_2 = -(25*A_ratio*np.tan(2*np.pi*f[1:]/a0*0.0857504))**-1
+
+# fig,ax = plt.subplots(1,2, figsize = (8,4.5))
+# plt.subplots_adjust(wspace = 0.3)
+
+# # plt.subplots_adjust(bottom = 0.15)
+# ax[0].plot(f[1:],np.real(Z_tot),c = 'black')
+# ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
+# ax[0].set_xlim([400,3e3])
+# ax[0].set_ylim([0,5])
+# ax[0].grid()
+# ax[0].set_xlabel('Frequency [Hz]')
+
+# ax[1].plot(f[1:],np.imag(Z_tot),c = 'black')
+# # ax[1].plot(f[1:],Z_tot_2)
+# ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
+# ax[1].set_xlim([400,3e3])
+# ax[1].set_ylim([-10,5])
+# ax[1].grid()
+# ax[1].set_xlabel('Frequency [Hz]')
+# # ax[-1].legend(['NU1','NU4'])
 
 #%%
 
 # Number of resonators
 N = 25
-L = np.array([ 3.751, 2.701, 2.110, 1.731, 1.350])*0.0254
+L = np.array([ 3.751, 2.701, 2.110, 1.731, 1.350])/39.37
+
 # L = np.array([2.701])*0.0254
 helm_dict = {}
 for i,n in enumerate(L):
-    helm_dict = {**helm_dict,**{f'helm{i}':res.resonator(a_n = 0.003809,a_c = 0.003809,L_n =n/2, L_c = n/2)}}
+    helm_dict = {**helm_dict,**{f'helm{i}':res.resonator(a_n = 0.00381,a_c = 0.00381,L_n =n/2, L_c = n/2)}}
     helm_dict[f'helm{i}'].set_Z(f[1:],model = 'k',rad = False,interior = False,loss = True,table = True)
 
 Z_tot = np.zeros(len(f[1:]))
+Z_tot_2 = np.zeros(len(f[1:]))
+
 for k,v in helm_dict.items():
     Z_tot = Z_tot+N/len(L)*A_ratio*(v.Z)**-1
-Z_tot = Z_tot**-1
+    Z_tot_2 = Z_tot_2+N/len(L)*A_ratio*np.tan(2*np.pi*f[1:]/a0*(v.L_n+v.L_c))
 
+Z_tot = Z_tot**-1
+Z_tot_2 = -Z_tot_2**-1
 # Br = 0.5
 # Bi = 8/(3*np.pi)
 # a_rad = 0.005388
@@ -136,6 +122,8 @@ ax[0].grid()
 
 ax[1].tick_params(axis = 'x', labelsize=0)
 ax[1].plot(f[1:],np.imag(Z_tot))
+ax[1].plot(f[1:],Z_tot_2)
+
 ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
 ax[1].set_xlim([500,3e3])
 ax[1].set_ylim([-5,5])
@@ -150,12 +138,13 @@ ax[-1].set_ylim([0, 1])
 
 #%%
 
-fs1  = res.fs(t = 1e-3,r = 0.5e-3,phi = 0.073)
-fs1.set_Z(f[1:])
+fs1  = res.fs(t = 0.8128e-3,r = 0.7366e-3/2,phi = 0.073)
+# fs1  = res.fs(t = 0.8128e-3,r =  0.8128e-3/2,phi = .067)
+fs1.set_Z(f[1:],model = '2P',SPL = 120,M = 0.005)
 
 Z_tot = np.zeros(len(f[1:]))
 for k,v in helm_dict.items():
-    Z_tot = Z_tot+N/len(L)*A_ratio*(v.Z+fs1.get_Z())**-1
+    Z_tot = Z_tot+N/len(L)*A_ratio*(v.Z+fs1.Z)**-1
 Z_tot = Z_tot**-1
 
 alpha = 1 - abs((Z_tot-1)/(Z_tot+1))**2
@@ -164,23 +153,23 @@ fig,ax = plt.subplots(3,1, figsize = (6.4,4.5))
 ax[0].tick_params(axis = 'x', labelsize=0)
 ax[0].plot(f[1:],np.real(Z_tot))
 ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
-ax[0].set_xlim([500,3e3])
-ax[0].set_ylim([0,10])
+ax[0].set_xlim([400,3.1e3])
+ax[0].set_ylim([-2.1,8.1])
 ax[0].grid()
 
 ax[1].tick_params(axis = 'x', labelsize=0)
 ax[1].plot(f[1:],np.imag(Z_tot))
 ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
-ax[1].set_xlim([500,3e3])
-ax[1].set_ylim([-5,5])
+ax[1].set_xlim([400,3.1e3])
+ax[1].set_ylim([-2.1,8.1])
 ax[1].grid()
 
 ax[-1].plot(f[1:],alpha)
 ax[-1].set_ylabel(r'$Absorption, \ \alpha$')
 ax[-1].set_xlabel('Frequency [Hz]')
 ax[-1].grid()
-ax[-1].set_xlim([500,3e3])
-ax[-1].set_ylim([0, 1])
+ax[-1].set_xlim([400,3.1e3])
+ax[-1].set_ylim([-.1, 1.1])
 
 
 #%% Optimization space - compare different radii and lengths / compare different neck/chamber radii and lengths

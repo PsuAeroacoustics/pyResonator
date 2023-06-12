@@ -122,7 +122,7 @@ e = 0.44
 # Bo-105 max thickness [m]
 t = 0.12*c
 # Estimated blade volume [m^2]
-V0 = 0.7*(R-e)/48*t*c*6
+V0 = 0.7*(R-e)/48*t*c
 
 # Blade surface area over which the resonators would be applied.
 A_s = 0.25*c*((R-e)/48)
@@ -190,9 +190,9 @@ ax.set_xlabel('Frequency [Hz]')
 ax.grid()
 ax.set_xlim([f[0],f[-1]])
 ax.set_ylim([0, 1])
-plt.savefig(os.path.join(os.getcwd(),'opt_res.png'),format = 'png')
+plt.savefig(os.path.join(os.getcwd(),'opt_res_3.png'),format = 'png')
 
-save_dir = os.path.join(os.getcwd(),'res_opt.h5')
+save_dir = os.path.join(os.getcwd(),'res_opt_z.h5')
 if os.path.exists(save_dir):
     os.remove(save_dir)
 

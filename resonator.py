@@ -9,12 +9,24 @@ from scipy.special import jv
 #%%
 fontName = 'Times New Roman'
 fontSize = 12
-plt.rc('font', **{'family': 'serif', 'serif': [fontName], 'size': fontSize})
+plt.rc('font',**{'family':'serif','serif':['Times'], 'size': fontSize})
+plt.rc('text', usetex=True)
 plt.rc('mathtext', **{'default': 'regular'})
 plt.rc('text', **{'usetex': False})
 plt.rc('lines', **{'linewidth': 2})
 
 #%%
+
+def newton(fun,fun_prime,x0,toll = 5e-10):
+    err = 1
+    while np.any(err > toll):
+        x1 = x0-fun(x0)/fun_prime(x0)
+        err = abs((x1-x0)/x1)
+        print(np.max(err))
+        x0 = x1
+    return x1
+
+
 
 class fs():
     def __init__(self,t,r,phi):
@@ -30,35 +42,60 @@ class fs():
         self.t = t
         # radius of holes in the facesheet [m]
         self.r = r
-        # perforation rate (porosity)
+        # perforation rate (porosity) - cavity open area ratio
         self.phi = phi
 
         # speed of sound [m/s]
-        self.c = 343
+        self.c = 340
         # density [kg/m^3]
         self.rho = 1.125
         # kinematic viscosity [m^2/s]
         self.nu = 14.88e-6
         
 
-    def set_Z(self,f):
+    def set_Z(self,f,model = 'A-S',SPL = 0,M = 0):
         '''
-        This function computes the complex normal acoustic impedance and absorption of the facesheet. This facesheet model was first derived by Atalla and Sgard and simlifies a generalized model (JCAPL model) by limiting it to the specific case of a perforated facesheet.
+        This function computes the complex normal acoustic impedance and absorption of the facesheet. The user has the choice to use the 2-parameter or the Atalla and Sgard semiempirical model. The default is the 2-parameter model. The Atalla and Sgard model simplifies a generalized model (JCAPL model) by limiting it to the specific case of a perforated facesheet.
         The model essentially treats the facesheet as an equivalent fluid subject to visco-inertial losses associated with the dissipative effects of the viscous boundary layer and flow distortions (resistive component) within the openings of the facesheet as well as the mass of the 
         air moving through that opening (reactive component). 
+        [Jones, Michael, Tony Parrott, and Willie Watson. "Uncertainty and sensitivity analyses of a two-parameter impedance prediction model." 14th AIAA/CEAS Aeroacoustics Conference (29th AIAA Aeroacoustics Conference). 2008.]
         [Atalla, Noureddine, and Franck Sgard. "Modeling of perforated plates and screens using rigid frame porous models." Journal of sound and vibration 303.1-2 (2007): 195-208.]
         '''
 
         self.w = 2*np.pi*f
-        # Geometric torosity with end correction
-        alpha_inf = 1+2/self.t*(0.48*np.sqrt(np.pi*self.r**2)*(1-1.14*np.sqrt(self.phi)))
-        # Flow resistivity
-        sigma = 8*self.nu*self.rho/(self.phi*self.r**2)
-        G = np.sqrt(1+1j*4*self.w*self.rho*alpha_inf**2*self.nu*self.rho/(sigma**2*self.phi**2*self.r**2))
-        # Effective density
-        rho_e = self.rho*alpha_inf*(1+sigma*self.phi*G/(1j*self.w*self.rho*alpha_inf))
-        self.Z = 1j*self.w*rho_e*self.t/(self.c*self.rho*self.phi)
-        self.alpha = 1 - abs((self.Z-1)/(self.Z+1))**2
+        self.k = self.w/self.c
+        if model == 'AS':
+            # Geometric torosity with end correction
+            alpha_inf = 1+2/self.t*(0.48*np.sqrt(np.pi*self.r**2)*(1-1.14*np.sqrt(self.phi)))
+            # Flow resistivity
+            sigma = 8*self.nu*self.rho/(self.phi*self.r**2)
+            G = np.sqrt(1+1j*4*self.w*self.rho*alpha_inf**2*self.nu*self.rho/(sigma**2*self.phi**2*self.r**2))
+            # Effective density
+            rho_e = self.rho*alpha_inf*(1+sigma*self.phi*G/(1j*self.w*self.rho*alpha_inf))
+            self.Z = 1j*self.w*rho_e*self.t/(self.c*self.rho*self.phi)
+            self.alpha = 1 - abs((self.Z-1)/(self.Z+1))**2
+
+        else:
+            
+            Cd = 0.76
+            delta_BL = 1.75e-3
+            Ki = 0.5 
+            Ke = 0.5
+            A = 64*self.nu*self.t/(2*self.c*self.phi*Cd*(2*self.r)**2)
+            B = (Ki+Ke)/(2*self.c*(self.phi*Cd)**2)
+            
+            # A = 1.4
+            # B = 0.2336
+            p = 20e-6*10**(SPL/20)
+
+            epsilon = 0.85*(1-0.7*np.sqrt(self.phi))/(1+305*M**3)
+
+            th_gf = M/(self.phi*(2+1.256*delta_BL/(2*self.r)))
+            Xm = (self.k*(self.t+2*epsilon*self.r))/(self.phi)
+            fun  = lambda x: x - A-B*p/(self.rho*self.c*(x**2+Xm**2)**(1/2))-th_gf
+            fun_prime = lambda x: 1 +B*p*x/(self.rho*self.c*(x**2+Xm**2)**(3/2))
+            R = newton(fun = fun,fun_prime =fun_prime,x0 = 1,toll = 5e-5 )
+            self.Z = R+1j*Xm
 
 
     def get_Z(self):
@@ -68,6 +105,7 @@ class fs():
     def get_alpha(self):
         assert hasattr(self,'Z'), 'The absorption coefficient has not been computed, run the set_Z(f) function first.'
         return self.alpha
+
 
 
 
@@ -93,7 +131,7 @@ class resonator():
         self.A_c = np.pi*a_c**2
         
         # speed of sound [m/s]
-        self.c = 343
+        self.c = 340
         # density [kg/m^3]
         self.rho = 1.125
         # kinematic viscosity [m^2/s]
@@ -101,7 +139,7 @@ class resonator():
         # Prantl number of air at 20C
         self.Pr = 0.71
         
-    def set_Z(self,f,model = 'Kirchoff',rad = True,loss = False,interior = False, table = False):
+    def set_Z(self,f,model = 'Kirchoff',rad = False,loss = False,interior = False, table = False):
         '''
         This function computes the complex normal impedance of the resonator. This can be accomplished using two different techniques. In the basic acoustic element (BAE) approach
         the resonator is modeled as a compination of acoustic masses and compliance elements. This technique is not valid at very high frequencies, therefore, only the first several
@@ -157,10 +195,6 @@ class resonator():
                 # np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[1/R_k_c,np.ones(len(self.w))]]).transpose(-1,0,1)@np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[1/self.Zb_c,np.ones(len(self.w))]]).transpose(-1,0,1)
         else:
 
-            self.s,self.ka,self.gamma_tab = self.get_gamma_tab()
-            f_re_gamma = RectBivariateSpline(x = self.s,y = self.ka, z = np.real(self.gamma_tab))
-            f_imag_gamma = RectBivariateSpline(x = self.s,y = self.ka, z = np.imag(self.gamma_tab))
-
             # reduced frequency of neck and cavity 
             ka_n = k*self.a_n
             ka_c = k*self.a_c
@@ -170,6 +204,10 @@ class resonator():
             s_c = self.a_c*np.sqrt(self.w/self.nu)
             
             if table:
+                self.s,self.ka,self.gamma_tab = self.get_gamma_tab()
+                f_re_gamma = RectBivariateSpline(x = self.s,y = self.ka, z = np.real(self.gamma_tab))
+                f_imag_gamma = RectBivariateSpline(x = self.s,y = self.ka, z = np.imag(self.gamma_tab))
+
                 # Use low-frequency approximation within this region [((ka_n<self.ka[1]) & (s_n>self.s[-1]))]
 
                 gamma_n = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_n,ka_n))))
@@ -188,7 +226,6 @@ class resonator():
             # characteristic impedance
             Zc_n = -1j/gamma_n*jv(0,1j**(3/2)*s_n)/jv(2,1j**(3/2)*s_n)
             Zc_c = -1j/gamma_c*jv(0,1j**(3/2)*s_c)/jv(2,1j**(3/2)*s_c)
-
             
         if model == 'BAE' or model == 'WG':
 
@@ -249,6 +286,7 @@ class resonator():
             self.Z = self.P/(self.U/self.A_n)*(self.rho*self.c)**-1
         else:
             self.Z = self.P/self.U
+            # Z2 = -1j*np.tan(-k*gamma_n*1j*self.L_n)**-1+-1j*np.tan(-k*gamma_c*1j*self.L_c)**-1
 
         self.set_alpha()
 
