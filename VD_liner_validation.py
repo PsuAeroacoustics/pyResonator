@@ -8,7 +8,7 @@ import re
 from scipy.interpolate import interp2d,RectBivariateSpline
 # Frequency array vector
 
-df = .25
+df = 1
 f_max = 3e3
 f = np.arange(int(f_max/df))*df
 
@@ -112,9 +112,10 @@ Z_tot_2 = -Z_tot_2**-1
 # Z_tot = Z_rad+Z_tot
 alpha = 1 - abs((Z_tot-1)/(Z_tot+1))**2
 
-fig,ax = plt.subplots(3,1, figsize = (6.4,4.5))
+fig,ax = plt.subplots(3,1, figsize = (5,7.5))
 ax[0].tick_params(axis = 'x', labelsize=0)
 ax[0].plot(f[1:],np.real(Z_tot))
+ax[0].set_yticks(np.arange(11)[::2])
 ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
 ax[0].set_xlim([500,3e3])
 ax[0].set_ylim([0,10])
@@ -123,10 +124,10 @@ ax[0].grid()
 ax[1].tick_params(axis = 'x', labelsize=0)
 ax[1].plot(f[1:],np.imag(Z_tot))
 ax[1].plot(f[1:],Z_tot_2)
-
 ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
 ax[1].set_xlim([500,3e3])
 ax[1].set_ylim([-5,5])
+ax[1].legend(['SAIM','-cot(kL)'])
 ax[1].grid()
 
 ax[-1].plot(f[1:],alpha)
@@ -138,38 +139,53 @@ ax[-1].set_ylim([0, 1])
 
 #%%
 
-fs1  = res.fs(t = 0.8128e-3,r = 0.7366e-3/2,phi = 0.073)
-# fs1  = res.fs(t = 0.8128e-3,r =  0.8128e-3/2,phi = .067)
-fs1.set_Z(f[1:],model = '2P',SPL = 120,M = 0.005)
+def init_res(f,a_n,L_n,a_c,L_c):
+    '''
+    This function creates and returns a resonator object with its complex impedance evaluated
+    '''
+    res_temp = res.resonator(a_n = a_n,L_n =L_n,a_c = a_c, L_c = L_c)
+    res_temp.set_Z(f,model = 'k',rad = False,interior = False,loss = True,table = False)
+    return res_temp
 
-Z_tot = np.zeros(len(f[1:]))
-for k,v in helm_dict.items():
-    Z_tot = Z_tot+N/len(L)*A_ratio*(v.Z+fs1.Z)**-1
-Z_tot = Z_tot**-1
+def init_fs(f,t_fs,r_fs,phi_fs,SPL,M,Z_cav):
+    '''
+    This function creates and returns a resonator object with its complex impedance evaluated
+    '''
+    fs_temp = res.fs(t = t_fs,r = r_fs,phi = phi_fs)
+    fs_temp.set_Z(f,M = M,SPL = SPL,model = '2P',Z_cav = Z_cav)
+    return fs_temp
 
+Z_res = np.array([init_res(f = f[1:],a_n = 0.00381,L_n = L[i]/2,a_c = 0.00381,L_c =  L[i]/2).Z for i in range(len(L))])
+Z_fs = np.array([init_fs(f = f[1:],t_fs = 0.8128e-3,r_fs = 0.7366e-3/2,phi_fs = 0.073,SPL = 120,M = 0,Z_cav = Z_res[i]).Z for i in range(len(L))])
+Z_tot = np.sum(N/len(L)*A_ratio*(Z_res+Z_fs)**-1,axis = 0)**-1
 alpha = 1 - abs((Z_tot-1)/(Z_tot+1))**2
 
-fig,ax = plt.subplots(3,1, figsize = (6.4,4.5))
+fig,ax = plt.subplots(3,1, figsize = (5,7.5))
 ax[0].tick_params(axis = 'x', labelsize=0)
 ax[0].plot(f[1:],np.real(Z_tot))
 ax[0].set_ylabel(r'$Resistance, \ \overline{\theta}$')
-ax[0].set_xlim([400,3.1e3])
-ax[0].set_ylim([-2.1,8.1])
+ax[0].set_xlim([500,3e3])
+ax[0].set_ylim([-.1,8.1])
+ax[0].set_yticks(np.arange(9)[::2])
 ax[0].grid()
 
 ax[1].tick_params(axis = 'x', labelsize=0)
 ax[1].plot(f[1:],np.imag(Z_tot))
 ax[1].set_ylabel(r'$Reactance, \ \overline{\chi}$')
-ax[1].set_xlim([400,3.1e3])
+ax[1].set_xlim([500,3e3])
 ax[1].set_ylim([-2.1,8.1])
+ax[1].set_yticks(np.arange(11)[::2]-2)
+
 ax[1].grid()
 
 ax[-1].plot(f[1:],alpha)
 ax[-1].set_ylabel(r'$Absorption, \ \alpha$')
 ax[-1].set_xlabel('Frequency [Hz]')
 ax[-1].grid()
-ax[-1].set_xlim([400,3.1e3])
-ax[-1].set_ylim([-.1, 1.1])
+ax[-1].set_xlim([500,3e3])
+ax[-1].set_ylim([-0, 1.1])
+ax[-1].set_yticks(np.arange(11)[::2]/10)
+
 
 
 #%% Optimization space - compare different radii and lengths / compare different neck/chamber radii and lengths

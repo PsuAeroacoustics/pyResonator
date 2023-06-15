@@ -53,7 +53,7 @@ class fs():
         self.nu = 14.88e-6
         
 
-    def set_Z(self,f,model = 'A-S',SPL = 0,M = 0):
+    def set_Z(self,f,model = '2P',SPL = 0,M = 0, Z_cav = 0):
         '''
         This function computes the complex normal acoustic impedance and absorption of the facesheet. The user has the choice to use the 2-parameter or the Atalla and Sgard semiempirical model. The default is the 2-parameter model. The Atalla and Sgard model simplifies a generalized model (JCAPL model) by limiting it to the specific case of a perforated facesheet.
         The model essentially treats the facesheet as an equivalent fluid subject to visco-inertial losses associated with the dissipative effects of the viscous boundary layer and flow distortions (resistive component) within the openings of the facesheet as well as the mass of the 
@@ -81,9 +81,12 @@ class fs():
             delta_BL = 1.75e-3
             Ki = 0.5 
             Ke = 0.5
-            A = 64*self.nu*self.t/(2*self.c*self.phi*Cd*(2*self.r)**2)
-            B = (Ki+Ke)/(2*self.c*(self.phi*Cd)**2)
-            
+            # A = 64*self.nu*self.t/(2*self.c*self.phi*Cd*(2*self.r)**2)
+            # B = (Ki+Ke)/(2*self.c*(self.phi*Cd)**2)
+
+            A = 64*self.rho*self.nu*self.t/(2*self.phi*Cd*(2*self.r)**2)
+            B = self.rho*(Ki+Ke)/(2*(self.phi*Cd)**2)
+
             # A = 1.4
             # B = 0.2336
             p = 20e-6*10**(SPL/20)
@@ -91,10 +94,17 @@ class fs():
             epsilon = 0.85*(1-0.7*np.sqrt(self.phi))/(1+305*M**3)
 
             th_gf = M/(self.phi*(2+1.256*delta_BL/(2*self.r)))
-            Xm = (self.k*(self.t+2*epsilon*self.r))/(self.phi)
-            fun  = lambda x: x - A-B*p/(self.rho*self.c*(x**2+Xm**2)**(1/2))-th_gf
-            fun_prime = lambda x: 1 +B*p*x/(self.rho*self.c*(x**2+Xm**2)**(3/2))
+            Xm = (self.k*(self.t+2*epsilon*self.r))/(self.phi*Cd)
+
+            # fun  = lambda x: x - A-B*p/(self.rho*self.c*((x+np.real(Z_cav))**2+(Xm+np.imag(Z_cav))**2)**(1/2))-th_gf
+            # fun_prime = lambda x: 1 +B*p*(x+np.real(Z_cav))/(self.rho*self.c*((x+np.real(Z_cav))**2+(Xm+np.imag(Z_cav))**2)**(3/2))
+
+            fun  = lambda x: self.rho*self.c*x - A-B*p/(self.rho*self.c*((x+np.real(Z_cav))**2+(Xm+np.imag(Z_cav))**2)**(1/2))-th_gf*self.rho*self.c
+            fun_prime = lambda x: self.rho*self.c +B*p*(x+np.real(Z_cav))/(self.rho*self.c*((x+np.real(Z_cav))**2+(Xm+np.imag(Z_cav))**2)**(3/2))
+
+
             R = newton(fun = fun,fun_prime =fun_prime,x0 = 1,toll = 5e-5 )
+            print(f'v_rms = {np.mean(p/(self.rho*self.c*((R+np.real(Z_cav))**2+(Xm+np.imag(Z_cav))**2)**(1/2)))}')
             self.Z = R+1j*Xm
 
 
