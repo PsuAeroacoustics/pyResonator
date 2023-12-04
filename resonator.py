@@ -22,7 +22,7 @@ def newton(fun,fun_prime,x0,toll = 5e-10):
     while np.any(err > toll):
         x1 = x0-fun(x0)/fun_prime(x0)
         err = abs((x1-x0)/x1)
-        print(np.max(err))
+        # print(np.max(err))
         x0 = x1
     return x1
 
@@ -104,7 +104,7 @@ class fs():
 
 
             R = newton(fun = fun,fun_prime =fun_prime,x0 = 1,toll = 5e-5 )
-            print(f'v_rms = {np.mean(p/(self.rho*self.c*((R+np.real(Z_cav))**2+(Xm+np.imag(Z_cav))**2)**(1/2)))}')
+            # print(f'v_rms = {np.mean(p/(self.rho*self.c*((R+np.real(Z_cav))**2+(Xm+np.imag(Z_cav))**2)**(1/2)))}')
             self.Z = R+1j*Xm
 
 
