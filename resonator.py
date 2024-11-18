@@ -1,19 +1,19 @@
+#!/usr/bin/env python3
+
+
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize, NonlinearConstraint
 import os
 import re
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline,CubicSpline
 from scipy.special import jv
+from scipy.optimize import least_squares
 
 #%%
-fontName = 'Times New Roman'
-fontSize = 12
-plt.rc('font',**{'family':'serif','serif':['Times'], 'size': fontSize})
-plt.rc('text', usetex=True)
-plt.rc('mathtext', **{'default': 'regular'})
-plt.rc('text', **{'usetex': False})
-plt.rc('lines', **{'linewidth': 2})
+plt.rcParams['text.usetex'] = True
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ["Times New Roman"]
+plt.rcParams['font.size'] = 12
 
 #%%
 
@@ -27,9 +27,8 @@ def newton(fun,fun_prime,x0,toll = 5e-10):
     return x1
 
 
-
 class fs():
-    def __init__(self,t,r,phi):
+    def __init__(self,t,r,phi,c = 340,rho = 1.125,nu = 14.88e-6):
         '''
         This function initializes an instance of a "fs" or facesheet object with the following parameters. 
         Parameter:
@@ -46,11 +45,11 @@ class fs():
         self.phi = phi
 
         # speed of sound [m/s]
-        self.c = 340
+        self.c = c
         # density [kg/m^3]
-        self.rho = 1.125
+        self.rho = rho
         # kinematic viscosity [m^2/s]
-        self.nu = 14.88e-6
+        self.nu = nu
         
 
     def set_Z(self,f,model = '2P',SPL = 0,M = 0, Z_cav = 0):
@@ -121,35 +120,142 @@ class fs():
 
 class resonator():
 
-    def __init__(self,a_n,L_n,a_c,L_c):
+    def __init__(self,c = 340,P = 101325,gamma =1.4,rho = 1.125,nu = 14.88e-6,Pr = 0.71,q=1.30384,s_b = 1.37,t = 0.01,sigma = None,phi = None,a_n = None,L_n = None,a_c = None,L_c= None):
         '''
-        This function initializes an instance of a "helmholtz" object with the following parameters. 
+        This function initializes an instance of a "resonator" object with the following parameters. The required parameters vary depending on w 
 
-        Parameter:
+    General fluid properties:
+        c: speed of sound [m/s]
+        P: atmospheric pressure [Pa]
+        rho: density [kg/m^3]
+        nu: kinematic viscosity [m^2/s]
+        Pr: Prantl number 
+        gamma: ratio of specific heats
+
+    Parameters of helmholtz resonators:
         a_n: Neck radius [m]
         L_n: Neck length [m]
         a_c: Cavity radius [m]
         L_c: Cavity length [m]
-        '''
-        # self.L_n = L_n+(a_n*8/(3*np.pi)*(1-1.25*np.sqrt(0.0225)))
-        self.L_n = L_n
-        self.L_c = L_c
-        self.a_n = a_n
-        self.a_c = a_c
 
-        self.A_n = np.pi*a_n**2
-        self.A_c = np.pi*a_c**2
+    Parameters of bulk porous materials:
+        t: thickness [m]
+        phi: porosity - ratio of the volume of air in the pores to the total volume
+        q: tortuosity - describes the shape of pores - (1/cos(theta) where theta is the pore-slant angle)
+        sigma: flow resistivity [MKS rayl/m = Pa*s*m^-2 = N*s*m^-4]
+        s_b: shape factor - adjustable parameter describing how much the pore geometry deviates from being cylinderical with a constant cross sectional area
+        '''
+        if a_n is not None:
+            # self.L_n = L_n+(a_n*8/(3*np.pi)*(1-1.25*np.sqrt(0.0225)))
+            self.L_n = L_n
+            self.L_c = L_c
+            self.a_n = a_n
+            self.a_c = a_c
+
+            self.A_n = np.pi*a_n**2
+            self.A_c = np.pi*a_c**2
         
+        # ambient pressure [Pa]
+        self.P = P
         # speed of sound [m/s]
-        self.c = 340
+        self.c = c
         # density [kg/m^3]
-        self.rho = 1.125
+        self.rho = rho
         # kinematic viscosity [m^2/s]
-        self.nu = 14.88e-6
+        self.nu = nu
         # Prantl number of air at 20C
-        self.Pr = 0.71
-        
+        self.Pr = Pr
+        # ratio of specific heats 
+        self.gamma = gamma
+
+        # thickness [m]
+        self.t = t
+        # porosity - ratio of the volume of air in the pores to the total volume
+        self.phi = phi
+        # tortuosity - describes the shape of pores - (1/cos(theta) where theta is the pore-slant angle)
+        self.q = q
+        # flow resistivity [MKS rayl/m = Pa*s*m^-2 = N*s*m^-4]
+        self.sigma = sigma
+        # shape factor - adjustable parameter describing how different the pore geometry is from cylinderical with a constant cross sectional area
+        self.s_b = s_b
+
     def set_Z(self,f,model = 'Kirchoff',rad = False,loss = False,interior = False, table = False):
+        self.f = f
+        self.w = 2*np.pi*f
+        if self.sigma is None:
+            self.ZKTL(model = model,rad = rad,loss = loss,interior = interior, table = table)
+        else:
+            self.porous_Z()
+        self.set_alpha()
+        
+
+    def porous_Z(self):
+        if self.phi is None:
+            self.delany_bazley()
+        else:
+            self.biot_allard()
+        self.Z = self.Z_c*np.tanh(self.Gamma*self.t)**-1
+
+    def delany_bazley(self):
+        c = self.f*self.rho/self.sigma
+        self.Z_c = self.rho*self.c*(1+0.0571*c**-0.754-1j*0.087*c**-0.732)
+        self.Gamma =1j*self.w/self.c*(1+0.0978*c**-0.7-1j*0.189*c**-0.595)
+
+    def biot_allard(self):
+
+        lam = self.s_b*(8*self.q**2*self.rho*self.w/(self.sigma*self.phi))**(1/2)
+        T_func = lambda x: jv(1,x)/jv(0,x)
+        T = T_func(lam*np.sqrt(-1j))
+        F = -1/4*lam*np.sqrt(-1j)*T/(1-2*T/(lam*np.sqrt(-1j)))
+        rho_d = self.rho*self.q**2-1j*self.phi*self.sigma/self.w*F
+        k_d = self.gamma*self.P*(1+2*(self.gamma-1)/(np.sqrt(self.Pr)*lam*np.sqrt(-1j))*T_func(np.sqrt(self.Pr)*lam*np.sqrt(-1j)))**-1
+        self.Gamma =1j*self.w*(rho_d/k_d)**(1/2)
+        self.Z_c = 1/self.phi*(rho_d*k_d)**(1/2)        
+
+    def tune_params(self,f,val_data_Re,val_data_Im,bnds = ([1e3,0.5,0.5,.2],[1e5,3,3,1])):
+        '''
+        This function adjusts the parameters of the Biot-Allard 4-parameter model to achieve a close fit with experimental data. 
+
+        Parameters:
+        f: Frequency array over which to evaluate the response
+        val_data_Re: Validation data of specific resistance (normalized by rho*c) formated as an array with two columns the first is the frequency and the second is the corresponding value of resistance
+        val_data_Im: Validation data of specific reactance (normalized by rho*c) formated as an array with two columns the first is the frequency and the second is the corresponding value of reactance
+        bnds: Min/Max bounds on the tunable parameters (flow resistivity, tortuosity, shape factor, and porosity)
+
+        '''
+
+        def get_Z(res_params):
+            # modifies parameters
+            self.sigma,self.q,self.s_b,self.phi = rescale_input(res_params)
+            # returns impedance
+            self.set_Z(f_interp)
+            # computes the error between the measurment and prediction
+            residual = np.abs(val_data-self.Z/(self.rho*self.c))
+            return residual
+        
+        # 1/3 octave band frequency array
+        f_3rd_oct = np.concatenate(((1000/2**(1/3*np.arange(1,19)[::-1])),(1000*2**(1/3*np.arange(0,14)))))
+        f_interp = f_3rd_oct[(val_data_Re[0,0]<f_3rd_oct) & (val_data_Re[-1,0]>f_3rd_oct)]
+
+        # interpolates empirical data
+        val_data_Re = CubicSpline(val_data_Re[:,0],val_data_Re[:,1])
+        val_data_Im = CubicSpline(val_data_Im[:,0],val_data_Im[:,1])
+        val_data = val_data_Re(f_interp)+1j*val_data_Im(f_interp)
+
+        # scales input parameters to range from 0-1
+        bnds = np.array(bnds)
+        scale_input = lambda x: (x-bnds[0])/(bnds[1]-bnds[0])
+        rescale_input = lambda x: x*(bnds[1]-bnds[0])+bnds[0]
+
+        # applies least-squares to tune the parameters
+        print('Tuning parameters...')
+        out = least_squares(get_Z, x0 = scale_input(np.array([self.sigma,self.q,self.s_b,self.phi])))        
+        self.sigma,self.q,self.s_b,self.phi = rescale_input(out.x)
+        print(f'$Model Tuned! Porosity: {np.round(self.phi,2)},Flow Resistivity: {np.round(self.sigma,2)} MKS Rayls, Shape Factor: {np.round(self.s_b,2)}, Tortuosity: {np.round(self.q**2,2)} $')
+        self.set_Z(f)
+
+
+    def ZKTL(self,model = 'Kirchoff',rad = False,loss = False,interior = False, table = False):
         '''
         This function computes the complex normal impedance of the resonator. This can be accomplished using two different techniques. In the basic acoustic element (BAE) approach
         the resonator is modeled as a compination of acoustic masses and compliance elements. This technique is not valid at very high frequencies, therefore, only the first several
@@ -160,8 +266,11 @@ class resonator():
         f: single or an array of frequency values [Hz]
         WG: set equal to True to compute the impedance using the waveguide solution or False to use the basic acoustic element approach.
         rad: set equal to True in order to include the spherical radiation impedance.
+        loss: only applies for the basic acoustic element (BAE) model and includes the thermoviscous losses when set to True
+        interior: applies correction to account for the arangement of the resonators. If a resonator is surrounded by other resonators that have the smae lengths this parameter should be set to True. 
+        table: set equal to True in order to use a lookup table to approximate the propagation constants instead of using the low frequency approximation proposed by Zwikker-Kosten. 
         '''
-        self.w = 2*np.pi*f
+
         k = self.w/self.c
         Z0_n = self.rho*self.c/self.A_n
         Z0_c = self.rho*self.c/self.A_c
@@ -188,7 +297,7 @@ class resonator():
                 # thermal boundary layer thickness for air @ 20C [m]
                 del_k = np.sqrt(2*0.026/(self.rho*self.w*1006))
                 # ratio of specific heats for air @ 20C
-                gamma = 1.4
+                self.gamma = 1.4
 
                 # wetted area
                 P_n = 2*np.pi*self.a_n*self.L_n
@@ -197,8 +306,8 @@ class resonator():
                 R_mu_n = self.rho*self.w*del_mu*P_n/(2*self.A_n**2)
                 R_mu_c = self.rho*self.w*del_mu*P_c/(2*self.A_c**2)
                 
-                R_k_n = ((gamma-1)*self.w*del_k*P_n/(2*self.rho*self.c**2))**-1
-                R_k_c =  ((gamma-1)*self.w*del_k*P_c/(2*self.rho*self.c**2))**-1
+                R_k_n = ((self.gamma-1)*self.w*del_k*P_n/(2*self.rho*self.c**2))**-1
+                R_k_c =  ((self.gamma-1)*self.w*del_k*P_c/(2*self.rho*self.c**2))**-1
 
                 # Z_c_2 = (np.array([[np.ones(len(self.w)),R_mu_c/2+self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),np.zeros(len(self.w))],[self.Zb_c**-1+R_k_c**-1,np.ones(len(self.w))]]).transpose(-1,0,1))@(np.array([[np.ones(len(self.w)),R_mu_c/2+self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1))
                 # Z_c_2 = np.array([[np.ones(len(self.w)),R_mu_c/2],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1)@np.array([[np.zeros(len(self.w)),self.Za_c],[np.zeros(len(self.w)),np.ones(len(self.w))]]).transpose(-1,0,1)@ \
@@ -298,7 +407,8 @@ class resonator():
             self.Z = self.P/self.U
             # Z2 = -1j*np.tan(-k*gamma_n*1j*self.L_n)**-1+-1j*np.tan(-k*gamma_c*1j*self.L_c)**-1
 
-        self.set_alpha()
+        
+
 
     
     def get_Z(self):
@@ -318,41 +428,6 @@ class resonator():
         
         self.alpha = 1 - abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
 
-
-
-    # def minimize_Z(self,f,lb=[0,0,0,0,0,0],ub=[np.inf,np.inf,np.inf,np.inf,np.inf,1]):
-    #     '''
-    #     This wrapper function performs a constrained optimization of the resonator which determines the dimensions of the resonator that minimizes the reflection coefficient, R
-    #     for a particular resonance frequency. There are three primary constraint conditions: a_n & a_c > 0, L_n & L_c > 0, L_n/L_c <1. The lower and upper bounds for each condition
-    #     can be specified as lists. Where the first four elements correspond to the min and max values of a_n, a_c, L_n, and L_c. The fourth element of the upper bound list 
-    #     sets the maximum length of the resonator (L_n+L_c). The final element simply states that the neck radius must be less than that of the cavity, a_n < a_c.
-
-    #     The optimizer changes the geometrical attributes (a_c,a_n,L_c,L_n) of the resonator instance during each itteration. 
-        
-    #     parameters:
-    #     lb: list of six lower bounds that correspond to each of the constraints. 
-    #     ub: list of six upper bounds that correspond to each of the constraints. 
-
-    #     '''
-
-    #     def get_constraints(lb,ub):
-    #         # constraints = NonlinearConstraint(fun = lambda x: [x[0],x[2],x[1],x[3],x[1]+x[3],x[0]/x[2]],lb =lb,ub = ub)
-    #         #(a_n,a_c,L_n,L_c)
-    #         constraints = NonlinearConstraint(fun = lambda x: [x[0],x[2],x[1],x[3], x[1]+x[3], x[1]*np.pi*x[0]**2+x[3]*np.pi*x[2]**2,x[0]/x[2]],lb =lb,ub = ub)
-    #         return constraints
-
-    #     def opt_wrap(dims,f):
-    #         self.a_n, self.L_n, self.a_c,self.L_c = dims[0],dims[1], dims[2],dims[3]
-    #         self.set_Z(f,WG=False,rad = True)
-    #         self.R = abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
-    #         # print(f'{abs((self.Z/(c*rho)-1)/(self.Z/(c*rho)+1))**2}, {1-4*np.real(self.Z/(c*rho))/((1+np.real(self.Z/(c*rho)))**2+np.imag(self.Z/(c*rho))**2)}')
-    #         # self.R =  1-4*np.real(self.Z/(c*rho))/((1+np.real(self.Z/(c*rho)))**2+np.imag(self.Z/(c*rho))**2)
-    #         # print(f'Searching for optimal geometry: R = {round(R,2)}, a_n = {round(self.a_n,2)}, L_n = {round(self.a_n,2)}, a_c = {round(self.a_n,2)}, L_c = {round(self.a_n,2)}')
-    #         print(f'Searching for optimal geometry: alpha = {1-self.R}, a_n = {self.a_n}, L_n = {self.L_n}, a_c = {self.a_c}, L_c = {self.L_c}')
-
-    #         return self.R
-
-    #     minimize(opt_wrap,x0 = [self.a_n,self.L_n,self.a_c,self.L_c],constraints = get_constraints(lb,ub),args = f,method = 'trust-constr')
 
     def plot(self,xlim = [1e2,10e3]):
         
