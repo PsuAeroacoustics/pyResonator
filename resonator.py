@@ -194,7 +194,7 @@ class resonator():
             self.delany_bazley()
         else:
             self.biot_allard()
-        self.Z = self.Z_c*np.tanh(self.Gamma*self.t)**-1
+        self.Z = self.Z_c*(self.rho*self.c)**-1*np.tanh(self.Gamma*self.t)**-1
 
     def delany_bazley(self):
         c = self.f*self.rho/self.sigma
@@ -230,7 +230,7 @@ class resonator():
             # returns impedance
             self.set_Z(f_interp)
             # computes the error between the measurment and prediction
-            residual = np.abs(val_data-self.Z/(self.rho*self.c))
+            residual = np.abs(val_data-self.Z)
             return residual
         
         # 1/3 octave band frequency array
@@ -408,9 +408,6 @@ class resonator():
             # Z2 = -1j*np.tan(-k*gamma_n*1j*self.L_n)**-1+-1j*np.tan(-k*gamma_c*1j*self.L_c)**-1
 
         
-
-
-    
     def get_Z(self):
         assert hasattr(self,'Z'), 'Impedance has not been computed, run the set_Z(f) function first.'
         return self.Z
@@ -419,14 +416,13 @@ class resonator():
         assert hasattr(self,'Z'), 'The absorption coefficient has not been computed, run the set_Z(f) function first.'
         return self.alpha
 
-
-    def set_alpha(self, f=[]):
+    def set_alpha(self):
         '''
         This function returns the normal impedance absorption coefficient for the helmholtz resonator. The impedance must be computed prior to the absorption coefficient. 
         '''
         # assert hasattr(self,'Z'), 'Impedance has not been computed, run the get_Z(w) before computing the absorption coefficient.'
         
-        self.alpha = 1 - abs((self.Z/(self.c*self.rho)-1)/(self.Z/(self.c*self.rho)+1))**2
+        self.alpha = 1 - abs((self.Z-1)/(self.Z+1))**2
 
 
     def plot(self,xlim = [1e2,10e3]):
