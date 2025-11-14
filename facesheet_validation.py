@@ -1,13 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 import resonator as res
 import os
-import sys
-from time import time
-import h5py
-sys.path.insert(0, os.path.join(os.path.dirname(os.getcwd()),'pyPostAcs'))
-import pyPostAcsFun as fun
 
 #%%
 

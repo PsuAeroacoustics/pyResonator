@@ -194,11 +194,11 @@ class resonator():
             self.delany_bazley()
         else:
             self.biot_allard()
-        self.Z = self.Z_c*(self.rho*self.c)**-1*np.tanh(self.Gamma*self.t)**-1
+        self.Z = self.Z_c*np.tanh(self.Gamma*self.t)**-1
 
     def delany_bazley(self):
         c = self.f*self.rho/self.sigma
-        self.Z_c = self.rho*self.c*(1+0.0571*c**-0.754-1j*0.087*c**-0.732)
+        self.Z_c = (1+0.0571*c**-0.754-1j*0.087*c**-0.732)
         self.Gamma =1j*self.w/self.c*(1+0.0978*c**-0.7-1j*0.189*c**-0.595)
 
     def biot_allard(self):
@@ -210,7 +210,7 @@ class resonator():
         rho_d = self.rho*self.q**2-1j*self.phi*self.sigma/self.w*F
         k_d = self.gamma*self.P*(1+2*(self.gamma-1)/(np.sqrt(self.Pr)*lam*np.sqrt(-1j))*T_func(np.sqrt(self.Pr)*lam*np.sqrt(-1j)))**-1
         self.Gamma =1j*self.w*(rho_d/k_d)**(1/2)
-        self.Z_c = 1/self.phi*(rho_d*k_d)**(1/2)        
+        self.Z_c = 1/self.phi*(rho_d*k_d)**(1/2)*(self.rho*self.c)**-1        
 
     def tune_params(self,f,val_data_Re,val_data_Im,bnds = ([1e3,0.5,0.5,.2],[1e5,3,3,1])):
         '''

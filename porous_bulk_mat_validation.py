@@ -31,7 +31,6 @@ c = np.sqrt(1.4*287.05*(273.15+18))
 # Prandtl number 
 Pr = 0.71
 
-
 #%% Filtros Qf-130 porous ceramic - Wilson, D. Keith. "Simple, relaxational models for the acoustical properties of porous media." 
 
 # thickness
@@ -53,7 +52,7 @@ Qf_130_BA.set_Z(f)
 
 fig,ax = plt.subplots(2,1, figsize = (5,6.5))
 fig.subplots_adjust(left = 0.15)
-ax[0].plot(f,np.real(Qf_130_DB.Z_c) )
+ax[0].plot(f,np.real(Qf_130_DB.Z_c))
 ax[0].plot(f,np.real(Qf_130_BA.Z_c) )
 ax[0].scatter(qf130_Re_Z[:,0],qf130_Re_Z[:,-1],c = 'black')
 ax[0].set_ylabel(r'$Re[Z_c/\rho c]$')
@@ -194,12 +193,18 @@ ax[0].set_xticklabels([])
 
 #%% cobalt metallic foam (ASTM F90) - Sutliff, Daniel L., Michael G. Jones, and Thomas C. Hartley. "High-speed turbofan noise reduction using foam-metal liner over-the-rotor." 
 
-t = 21.59e-3
-mfoam = res.resonator(q=q,s_b =s_b,t =t,sigma = sigma,phi = phi,Pr = 0.71,c =c,rho =rho)
-mfoam.tune_params(f,mfoam_85in_Re_Z,mfoam_85in_Im_Z,bnds = ([1e3,0.5,0.5,.2],[1e5,3,3,1]))
+# thickness
+t = 43.18e-3
+# porosity - ratio of the volume of air in the pores to the total volume of the sample 
+phi = .9
+# flow resistivity [MKS rayls/m]
+sigma = 18980
+# torousity
+q = np.sqrt(1.513)
+s_b = 1.0142
 
-mfoam.t = 43.18e-3
-mfoam.set_Z(f)
+mfoam = res.resonator(q=q,s_b =s_b,t =t,sigma = sigma,phi = phi,Pr = 0.71,c =c,rho =rho)
+mfoam.tune_params(f,mfoam_170in_Re_Z,mfoam_170in_Im_Z,bnds = ([1e3,0.5,0.5,.2],[1e5,3,3,1]))
 
 fig,ax = plt.subplots(2,1, figsize = (5,6.5))
 fig.subplots_adjust(left = 0.15)
@@ -208,6 +213,28 @@ ax[0].scatter(mfoam_170in_Re_Z[:,0],mfoam_170in_Re_Z[:,-1],c = 'black')
 ax[0].set_ylabel(r'$Re[Z/\rho c]$')
 ax[1].plot(f,np.imag(mfoam.Z) )
 ax[1].scatter(mfoam_170in_Im_Z[:,0],mfoam_170in_Im_Z[:,-1],c = 'black')
+
+ax[1].set_ylabel(r'$Im[Z/\rho c]$')
+ax[1].set_xlabel(r'$Frequency \ [Hz]$')
+ax[1].legend(['Predicted','Measured'])
+for i in range(2):
+    ax[i].set_ylim([-5,3])
+    ax[i].set_xlim([1,3.5e3])
+    ax[i].grid()
+ax[0].set_xticklabels([])
+
+
+
+mfoam.t =  (23.31e-3)/4
+mfoam.set_Z(f)
+
+fig,ax = plt.subplots(2,1, figsize = (5,6.5))
+fig.subplots_adjust(left = 0.15)
+ax[0].plot(f,np.real(mfoam.Z) )
+ax[0].scatter(mfoam_85in_Re_Z[:,0],mfoam_85in_Re_Z[:,-1],c = 'black')
+ax[0].set_ylabel(r'$Re[Z/\rho c]$')
+ax[1].plot(f,np.imag(mfoam.Z) )
+ax[1].scatter(mfoam_85in_Im_Z[:,0],mfoam_85in_Im_Z[:,-1],c = 'black')
 
 ax[1].set_ylabel(r'$Im[Z/\rho c]$')
 ax[1].set_xlabel(r'$Frequency \ [Hz]$')
