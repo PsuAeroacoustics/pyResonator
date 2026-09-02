@@ -3,3 +3,6 @@ __pycache__/
 .vscode/
 .python-version
 .DS_Store
+mdof_rad_z_example.py
+facesheet_validation.py
+add_fs.py

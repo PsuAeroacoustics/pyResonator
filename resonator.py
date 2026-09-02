@@ -10,12 +10,6 @@ from scipy.special import jv
 from scipy.optimize import least_squares
 
 #%%
-plt.rcParams['text.usetex'] = True
-plt.rcParams['font.family'] = 'serif'
-plt.rcParams['font.serif'] = ["Times New Roman"]
-plt.rcParams['font.size'] = 12
-
-#%%
 
 def newton(fun,fun_prime,x0,toll = 5e-10):
     err = 1
@@ -329,22 +323,22 @@ class resonator():
 
                 # Use low-frequency approximation within this region [((ka_n<self.ka[1]) & (s_n>self.s[-1]))]
 
-                gamma_n = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_n,ka_n))))
-                gamma_c = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_c,ka_c))))
+                self.gamma_n = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_n,ka_n))))
+                self.gamma_c = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_c,ka_c))))
 
             else:
                 # propagation constants
                 nu_gamma_n = (1+(1.4-1)/1.4*jv(2,1j**(3/2)*self.Pr**(1/2)*s_n)/jv(0,1j**(3/2)*self.Pr**(1/2)*s_n))**-1
-                gamma_n = np.sqrt(jv(0,1j**(3/2)*s_n)/jv(2,1j**(3/2)*s_n))*np.sqrt(1.4/nu_gamma_n)
+                self.gamma_n = np.sqrt(jv(0,1j**(3/2)*s_n)/jv(2,1j**(3/2)*s_n))*np.sqrt(1.4/nu_gamma_n)
                 nu_gamma_c = (1+(1.4-1)/1.4*jv(2,1j**(3/2)*self.Pr**(1/2)*s_c)/jv(0,1j**(3/2)*self.Pr**(1/2)*s_c))**-1
-                gamma_c = np.sqrt(jv(0,1j**(3/2)*s_c)/jv(2,1j**(3/2)*s_c))*np.sqrt(1.4/nu_gamma_c)
+                self.gamma_c = np.sqrt(jv(0,1j**(3/2)*s_c)/jv(2,1j**(3/2)*s_c))*np.sqrt(1.4/nu_gamma_c)
 
-            # gamma_n = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_n,ka_n))))
-            # gamma_c = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_c,ka_c))))
+            # self.gamma_n = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_n,ka_n))))
+            # self.gamma_c = np.squeeze(np.array(list(map(lambda x,y: f_re_gamma(x = x,y = y)+1j*f_imag_gamma(x = x,y = y) ,s_c,ka_c))))
 
             # characteristic impedance
-            Zc_n = -1j/gamma_n*jv(0,1j**(3/2)*s_n)/jv(2,1j**(3/2)*s_n)
-            Zc_c = -1j/gamma_c*jv(0,1j**(3/2)*s_c)/jv(2,1j**(3/2)*s_c)
+            self.Zc_n = -1j/self.gamma_n*jv(0,1j**(3/2)*s_n)/jv(2,1j**(3/2)*s_n)
+            self.Zc_c = -1j/self.gamma_c*jv(0,1j**(3/2)*s_c)/jv(2,1j**(3/2)*s_c)
             
         if model == 'BAE' or model == 'WG':
 
@@ -368,8 +362,8 @@ class resonator():
                     self.T_c = np.array([[1+self.Za_c/self.Zb_c,self.Za_c],[1/self.Zb_c,1]])
         else:
             
-            self.T_n = np.array([[np.cosh(k*gamma_n*self.L_n),Zc_n*np.sinh(k*gamma_n*self.L_n)],[Zc_n**-1*np.sinh(k*gamma_n*self.L_n),np.cosh(k*gamma_n*self.L_n)]]).transpose(-1,0,1)
-            self.T_c = np.array([[np.cosh(k*gamma_c*self.L_c),Zc_c*np.sinh(k*gamma_c*self.L_c)],[Zc_c**-1*np.sinh(k*gamma_c*self.L_c),np.cosh(k*gamma_c*self.L_c)]]).transpose(-1,0,1)
+            self.T_n = np.array([[np.cosh(k*self.gamma_n*self.L_n),self.Zc_n*np.sinh(k*self.gamma_n*self.L_n)],[self.Zc_n**-1*np.sinh(k*self.gamma_n*self.L_n),np.cosh(k*self.gamma_n*self.L_n)]]).transpose(-1,0,1)
+            self.T_c = np.array([[np.cosh(k*self.gamma_c*self.L_c),self.Zc_c*np.sinh(k*self.gamma_c*self.L_c)],[self.Zc_c**-1*np.sinh(k*self.gamma_c*self.L_c),np.cosh(k*self.gamma_c*self.L_c)]]).transpose(-1,0,1)
 
         if rad:
             
@@ -405,7 +399,7 @@ class resonator():
             self.Z = self.P/(self.U/self.A_n)*(self.rho*self.c)**-1
         else:
             self.Z = self.P/self.U
-            # Z2 = -1j*np.tan(-k*gamma_n*1j*self.L_n)**-1+-1j*np.tan(-k*gamma_c*1j*self.L_c)**-1
+            # Z2 = -1j*np.tan(-k*self.gamma_n*1j*self.L_n)**-1+-1j*np.tan(-k*self.gamma_c*1j*self.L_c)**-1
 
         
     def get_Z(self):
